@@ -8,8 +8,8 @@ from torch.nn import Module as TorchModel
 from tensorflow.keras.models import Model as TFModel
 import tensorflow as tf
 
-from adversary.models.losses import Loss, LossRegistry
-from adversary.models.optimizers import Optimizer, OptimizerRegistry
+from adversary.core.losses import Loss, LossRegistry
+from adversary.core.optimizers import Optimizer, OptimizerRegistry
 
 class WhiteBoxAttack(ABC):
     def __init__(self, 

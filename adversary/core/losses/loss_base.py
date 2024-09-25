@@ -4,7 +4,7 @@ import torch
 import tensorflow as tf
 
 
-class BaseFrameworkMeta(ABCMeta):
+class LossMeta(ABCMeta):
     def __new__(cls, name, bases, dct):
         if 'calculate' not in dct:
             raise TypeError(f"{name} class must implement a 'calculate' method.")
@@ -26,7 +26,7 @@ class BaseFrameworkMeta(ABCMeta):
         return super().__new__(cls, name, bases, dct)
 
 
-class Loss(metaclass=BaseFrameworkMeta):
+class Loss(metaclass=LossMeta):
     def __init__(self, framework: Literal["torch", "tf"]) -> None:
         self.framework = framework
 

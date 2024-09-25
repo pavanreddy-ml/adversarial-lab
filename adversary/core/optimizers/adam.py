@@ -29,6 +29,9 @@ class Adam(Optimizer):
     def torch_apply(self, 
                     model_weights: List[torch.Tensor], 
                     gradients: List[torch.Tensor]) -> None:
+        if len(self.optimizer.param_groups[0]['params']) == 0:
+            self.optimizer.add_param_group({'params': model_weights})
+
         for param, grad in zip(model_weights, gradients):
             param.grad = grad
 
