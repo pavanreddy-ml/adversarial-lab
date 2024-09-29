@@ -21,7 +21,8 @@ class WhiteBoxAttack(ABC):
                  **kwargs
                  ) -> None:
         
-        if optimizer_params is None: self.optimizer_params = {}
+        if optimizer_params is None: 
+            self.optimizer_params = {}
 
         if isinstance(model, torch.nn.Module):
             self.framework = "torch"
@@ -31,7 +32,8 @@ class WhiteBoxAttack(ABC):
             raise ValueError("Unsupported model type. Must be a PyTorch or TensorFlow model.")
         
         if isinstance(loss, str):
-            self.loss = LossRegistry.get(loss)
+            loss_class = LossRegistry.get(loss)
+            self.loss - loss_class(framework=self.framework)
         elif isinstance(loss, Loss):
             self.loss = loss
         else:

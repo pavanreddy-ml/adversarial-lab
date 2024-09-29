@@ -17,7 +17,7 @@ class CategoricalCrossEntropy(Loss):
                   model: Union[torch.nn.Module, tf.keras.Model], 
                   inputs: Union[torch.Tensor, tf.Tensor], 
                   targets: Union[torch.Tensor, tf.Tensor]):
-        return super().calculate(output, target)
+        return super().calculate(model, inputs, targets)
 
     def torch_op(self, 
                  model: torch.nn.Module, 
