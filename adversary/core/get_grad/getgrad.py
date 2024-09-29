@@ -1,23 +1,27 @@
+from . import GetGradsBase
+
 from typing import Literal, List, Union
-from . import Loss
+
+from abc import abstractmethod, ABC, ABCMeta
 
 import torch
 import tensorflow as tf
-from torch.nn import functional as F
-from tensorflow.keras.losses import categorical_crossentropy
 
 
-class CategoricalCrossEntropy(Loss):
-    def __init__(self,
-                 framework: Literal["torch", "tf"]
-                 ) -> None:
-        super().__init__(framework)
+
+class GetGrads(GetGradsBase):
+    def __init__(self, 
+                 framework: Literal["torch", "tf"],
+                 loss) -> None:
+        super().__init__(None, loss)
+        self.framework = framework
+        self.loss = loss
 
     def calculate(self, 
                   model: Union[torch.nn.Module, tf.keras.Model], 
                   inputs: Union[torch.Tensor, tf.Tensor], 
                   targets: Union[torch.Tensor, tf.Tensor]):
-        return super().calculate(output, target)
+        return super().calculate(model, inputs, targets)
 
     def torch_op(self, 
                  model: torch.nn.Module, 
