@@ -25,8 +25,13 @@ class Adam(Optimizer):
             self.optimizer = TFAdam(learning_rate=self.learning_rate, beta_1=self.beta1, beta_2=self.beta2, epsilon=self.epsilon)
         else:
             raise ValueError("Framework must be either 'torch' or 'tf'")
+        
+    def apply(self,
+              model_weights: torch.Tensor,
+              gradients: torch.Tensor):
+        super().apply(model_weights, gradients)
 
-    def torch_apply(self, 
+    def torch_op(self, 
                     model_weights: List[torch.Tensor], 
                     gradients: List[torch.Tensor]) -> None:
         if len(self.optimizer.param_groups[0]['params']) == 0:
@@ -38,7 +43,7 @@ class Adam(Optimizer):
         self.optimizer.step()
         self.optimizer.zero_grad()
 
-    def tf_apply(self, 
+    def tf_op(self, 
                  model_weights: List[tf.Variable], 
                  gradients: List[tf.Tensor]) -> None:
         self.optimizer.apply_gradients(zip(gradients, model_weights))

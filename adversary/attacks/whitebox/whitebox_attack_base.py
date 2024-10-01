@@ -10,6 +10,7 @@ import tensorflow as tf
 
 from adversary.core.losses import Loss, LossRegistry
 from adversary.core.optimizers import Optimizer, OptimizerRegistry
+from adversary.core.modelinfo import ModelInfo
 
 class WhiteBoxAttack(ABC):
     def __init__(self, 
@@ -21,19 +22,21 @@ class WhiteBoxAttack(ABC):
                  **kwargs
                  ) -> None:
         
+        self.model = model
+        
         if optimizer_params is None: 
             self.optimizer_params = {}
 
         if isinstance(model, torch.nn.Module):
             self.framework = "torch"
         elif isinstance(model, tf.keras.Model):
-            self.framework = "tensorflow"
+            self.framework = "tf"
         else:
             raise ValueError("Unsupported model type. Must be a PyTorch or TensorFlow model.")
         
         if isinstance(loss, str):
             loss_class = LossRegistry.get(loss)
-            self.loss - loss_class(framework=self.framework)
+            self.loss = loss_class(framework=self.framework)
         elif isinstance(loss, Loss):
             self.loss = loss
         else:
@@ -41,11 +44,14 @@ class WhiteBoxAttack(ABC):
         
         if isinstance(optimizer, str):
             optimizer_class = OptimizerRegistry.get(optimizer)
-            self.optimizer = optimizer_class(**optimizer_params)
+            self.optimizer = optimizer_class(framework=self.framework, **self.optimizer_params)
         elif isinstance(optimizer, Optimizer):
             self.optimizer = optimizer
         else:
             raise TypeError(f"Invalid type for optimizer: '{type(optimizer)}'")
+        
+        get_model_info = ModelInfo(framework=self.framework)
+        self.model_info = get_model_info.get_info(model)
 
     @abstractmethod
     def attack(self, 
