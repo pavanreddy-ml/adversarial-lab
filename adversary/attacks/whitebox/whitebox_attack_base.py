@@ -11,6 +11,8 @@ import tensorflow as tf
 from adversary.core.losses import Loss, LossRegistry
 from adversary.core.optimizers import Optimizer, OptimizerRegistry
 from adversary.core.modelinfo import ModelInfo
+from adversary.core.tensor_ops import TensorOps
+from adversary.core.noise_generators import AdditiveNoiseGenerator, NoiseGenerator
 
 class WhiteBoxAttack(ABC):
     def __init__(self, 
@@ -18,6 +20,7 @@ class WhiteBoxAttack(ABC):
                  loss: Union[str, Loss],
                  optimizer: Union[str, Optimizer],
                  optimizer_params: Union[Dict, None] = None,
+                 noise_generator = None,
                  *args,
                  **kwargs
                  ) -> None:
@@ -50,14 +53,22 @@ class WhiteBoxAttack(ABC):
         else:
             raise TypeError(f"Invalid type for optimizer: '{type(optimizer)}'")
         
+        if noise_generator is None:
+            self.noise_generator = AdditiveNoiseGenerator(framework="tf", epsilon=0.2, dist='uniform')
+        elif isinstance(optimizer, NoiseGenerator):
+            self.noise_generator = OptimizerRegistry.get(optimizer)
+        else:
+            raise TypeError(f"Invalid type for optimizer: '{type(optimizer)}'")
+
+        self.tensor_ops = TensorOps(framework=self.framework)
+        
         get_model_info = ModelInfo(framework=self.framework)
         self.model_info = get_model_info.get_info(model)
 
     @abstractmethod
-    def attack(self, 
-               sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
-               confidence_threshold: float,
+    def attack(self,
+               sample,
+               epochs=10,
                *args,
-               **kwargs
-               ) -> np.ndarray:
+               **kwargs):
         pass
