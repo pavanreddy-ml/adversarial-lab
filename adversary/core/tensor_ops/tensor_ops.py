@@ -44,13 +44,13 @@ class TensorOpsMeta(ABCMeta):
             framework = args[0]
 
         if framework == "torch":
-            cls = type(cls.__name__, (TensorOpsTorch, cls), {})
+            specific_class = TensorOpsTorch
         elif framework == "tf":
-            cls = type(cls.__name__, (TensorOpsTF, cls), {})
+            specific_class = TensorOpsTF
         else:
             raise ValueError(f"Unsupported framework: {framework}")
 
-        return super(TensorOpsMeta, cls).__call__(*args, **kwargs)
+        return specific_class(*args, **kwargs)
 
 
 class TensorOps(Generic[T], metaclass=TensorOpsMeta):

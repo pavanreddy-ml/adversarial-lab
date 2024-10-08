@@ -1,5 +1,5 @@
 from abc import ABCMeta
-from typing import Literal
+from typing import Literal, Union
 import torch
 import tensorflow as tf
 
@@ -35,20 +35,20 @@ class MathMeta(ABCMeta):
                 error_message + 
                 "For consistency, please implement these methods in both MathTorch and MathTF."
             )
-
-    def __call__(cls, *args, **kwargs):
+    
+    def __call__(cls, *args, **kwargs) -> Union[MathTF, MathTorch]:
         framework = kwargs.get('framework', None)
         if framework is None and len(args) > 0:
             framework = args[0]
 
         if framework == "torch":
-            cls = type(cls.__name__, (MathTorch, cls), {})
+            specific_class = MathTorch
         elif framework == "tf":
-            cls = type(cls.__name__, (MathTF, cls), {})
+            specific_class = MathTF
         else:
             raise ValueError(f"Unsupported framework: {framework}")
 
-        return super(MathMeta, cls).__call__(*args, **kwargs)
+        return specific_class(*args, **kwargs)
 
 
 class Math(metaclass=MathMeta):

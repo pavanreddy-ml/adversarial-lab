@@ -1,4 +1,4 @@
-from . noise_generator_base import NoiseGenerator
+from . noise_generator_base import NoiseGenerator, NoiseGeneratorMeta
 from .additive_noise_generator import AdditiveNoiseGenerator
 
-__all__ = ["NoiseGenerator", "AdditiveNoiseGenerator"]
+__all__ = ["NoiseGenerator", "NoiseGeneratorMeta", "AdditiveNoiseGenerator"]

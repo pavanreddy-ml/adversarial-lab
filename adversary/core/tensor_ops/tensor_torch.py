@@ -19,5 +19,5 @@ class TensorOpsTorch():
 
     def to_tensor(self, 
                   data: Any, 
-                  dtype: torch.DType = torch.float32) -> torch.Tensor:
+                  dtype: torch.dtype = torch.float32) -> torch.Tensor:
         raise NotImplementedError("'to_tensor' not Implemented for Torch")
