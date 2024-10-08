@@ -5,6 +5,7 @@ from adversary.core.optimizers.optimizer_base import Optimizer
 from tensorflow.keras.models import Model as TFModel
 import tensorflow as tf
 from . import WhiteBoxAttack
+import torch
 
 import numpy as np
 
@@ -21,8 +22,8 @@ class TargetedWhiteBoxAttack(WhiteBoxAttack):
         super().__init__(model, loss, optimizer, optimizer_params, noise_generator, *args, **kwargs)
 
     def attack(self,
-               sample,
-               target_class,
+               sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
+               target_class: int,
                target_vector=None,
                epochs=10,
                *args,
@@ -39,9 +40,11 @@ class TargetedWhiteBoxAttack(WhiteBoxAttack):
         if len(target_vector) != self.model_info["output_shape"][1]:
             raise ValueError("target_vector must be the same size outputs.")
         
-        noise = self.noise_generator.generate()
+        noise = self.noise_generator.generate(sample)
+
+        gradeints = self.get_grads.calculate(self.model, sample, noise, self.noise_generator, target_vector)
         
-        return target_vector
+        return gradeints
         
 
 

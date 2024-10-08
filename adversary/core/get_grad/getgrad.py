@@ -1,4 +1,6 @@
 from . import GetGradsBase
+from adversary.core.noise_generators import NoiseGenerator
+from adversary.core.losses import Loss
 
 from typing import Literal, List, Union
 
@@ -8,38 +10,45 @@ import torch
 import tensorflow as tf
 
 
-
 class GetGrads(GetGradsBase):
-    def __init__(self, 
+    def __init__(self,
                  framework: Literal["torch", "tf"],
-                 loss) -> None:
+                 loss: Loss) -> None:
         super().__init__(None, loss)
         self.framework = framework
         self.loss = loss
 
-    def calculate(self, 
-                  model: Union[torch.nn.Module, tf.keras.Model], 
-                  inputs: Union[torch.Tensor, tf.Tensor], 
+    def calculate(self,
+                  model: Union[torch.nn.Module, tf.keras.Model],
+                  sample: Union[torch.Tensor, tf.Tensor],
+                  noise: Union[torch.Tensor, tf.Tensor],
+                  noise_generator: NoiseGenerator,
                   targets: Union[torch.Tensor, tf.Tensor]):
-        return super().calculate(model, inputs, targets)
+        return super().calculate(model, sample, noise, noise_generator, targets)
 
-    def torch_op(self, 
-                 model: torch.nn.Module, 
-                 inputs: torch.Tensor, 
-                 targets: torch.Tensor
-                 ) -> List[torch.Tensor]:
-        model.zero_grad()
-        outputs = model(inputs)
-        loss = self.loss.calculate(outputs, targets)
-        loss.backward()
-        return [param.grad for param in model.parameters() if param.grad is not None]
+    def torch_op(self,
+                 model: Union[torch.nn.Module, tf.keras.Model],
+                 sample: Union[torch.Tensor, tf.Tensor],
+                 noise: Union[torch.Tensor, tf.Tensor],
+                 noise_generator: NoiseGenerator,
+                 targets: Union[torch.Tensor, tf.Tensor]) -> List[torch.Tensor]:
+        raise NotImplementedError("Not implemented for Torch")
 
-    def tf_op(self, 
-              model: tf.keras.Model, 
-              inputs: tf.Tensor, 
+    def tf_op(self,
+              model: tf.keras.Model,
+              sample: tf.Tensor,
+              noise: tf.Tensor,
+              noise_generator: NoiseGenerator,
               targets: tf.Tensor
               ) -> List[tf.Tensor]:
+        noise = tf.Variable(noise, trainable=True)
+
         with tf.GradientTape() as tape:
-            outputs = model(inputs)
+            tape.watch(noise)
+            
+            input = noise_generator.apply_noise(sample, noise)
+            outputs = model(input)
             loss = self.loss.calculate(outputs, targets)
-        return tape.gradient(loss, model.trainable_variables)
+  
+        gradients = tape.gradient(loss, noise)
+        return gradients

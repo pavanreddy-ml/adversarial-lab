@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod, ABCMeta
-from typing import Literal
+from typing import Literal, Union, List
+import numpy as np
 import torch
 import tensorflow as tf
 import importlib

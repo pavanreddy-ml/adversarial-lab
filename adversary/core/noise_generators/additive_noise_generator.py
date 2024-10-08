@@ -5,6 +5,8 @@ import torch
 import tensorflow as tf
 from torch.nn import functional as F
 
+import numpy as np
+
 class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
     def __init__(self,
                  framework: Literal["torch", "tf"],
@@ -22,7 +24,15 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
         self.scale = scale
 
     def generate(self, 
-              shape: List[int]) -> tf.Tensor:
+                 sample: Union[np.ndarray, torch.Tensor, tf.Tensor]) -> tf.Tensor:
+
+        if not isinstance(sample, (np.ndarray, torch.Tensor, tf.Tensor)):
+            raise TypeError("Input must be of type np.ndarray, torch.Tensor, or tf.Tensor")
+
+        shape = sample.shape
+        if shape[0] is None:
+            shape = shape[1:]
+        
         if self.dist == "normal":
             noise = tf.random.normal(shape)
             noise = tf.clip_by_value(noise, -1, 1) * self.epsilon
@@ -36,6 +46,7 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
             target_min, target_max = self.scale
             noise = (noise - current_min) / (current_max - current_min) * (target_max - target_min) + target_min
         
+        noise = tf.Variable(noise)
         return noise
     
     def apply_noise(self, sample: tf.Tensor, noise: tf.Tensor) -> tf.Tensor:

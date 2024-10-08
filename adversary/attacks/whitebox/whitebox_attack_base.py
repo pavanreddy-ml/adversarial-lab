@@ -13,6 +13,7 @@ from adversary.core.optimizers import Optimizer, OptimizerRegistry
 from adversary.core.modelinfo import ModelInfo
 from adversary.core.tensor_ops import TensorOps
 from adversary.core.noise_generators import AdditiveNoiseGenerator, NoiseGenerator
+from adversary.core.get_grad import GetGrads
 
 class WhiteBoxAttack(ABC):
     def __init__(self, 
@@ -61,6 +62,8 @@ class WhiteBoxAttack(ABC):
             raise TypeError(f"Invalid type for optimizer: '{type(optimizer)}'")
 
         self.tensor_ops = TensorOps(framework=self.framework)
+
+        self.get_grads = GetGrads(framework=self.framework, loss=self.loss)
         
         get_model_info = ModelInfo(framework=self.framework)
         self.model_info = get_model_info.get_info(model)
