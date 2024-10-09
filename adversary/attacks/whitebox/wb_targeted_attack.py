@@ -51,8 +51,9 @@ class TargetedWhiteBoxAttack(WhiteBoxAttack):
             if self.noise_generator.use_constraints:
                 noise = self.noise_generator.apply_constraints(noise)
 
+            preprocessed_sample
             # Dev Only. Remove in Release
-            print(self.model.predict(noise, verbose=0)[0][target_class])
+            print(self.model.predict(self.noise_generator.apply_noise(preprocessed_sample, noise), verbose=0)[0][target_class])
 
         return noise.numpy()
         

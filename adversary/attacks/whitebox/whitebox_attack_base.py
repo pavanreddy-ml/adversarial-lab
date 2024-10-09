@@ -57,7 +57,7 @@ class WhiteBoxAttack(ABC):
             raise TypeError(f"Invalid type for optimizer: '{type(optimizer)}'")
         
         if noise_generator is None:
-            self.noise_generator = AdditiveNoiseGenerator(framework="tf", use_constraints=True, epsilon=0.2, dist='uniform')
+            self.noise_generator = AdditiveNoiseGenerator(framework="tf", use_constraints=True, epsilon=0.005, dist='uniform')
         elif isinstance(noise_generator, NoiseGenerator):
             self.noise_generator = noise_generator
         else:
