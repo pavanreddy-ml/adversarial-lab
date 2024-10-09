@@ -10,18 +10,23 @@ import numpy as np
 class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
     def __init__(self,
                  framework: Literal["torch", "tf"],
+                 use_constraints: bool,
                  epsilon: float,
                  scale: List[int] = None,
                  dist: Literal["normal", "uniform"] = "normal"
                  ) -> None:
-        self.framework = framework
+        super().__init__(framework, use_constraints)
 
         if epsilon < 0 or epsilon > 1:
             raise ValueError("Epsilon must be between 0 and 1")
 
         self.epsilon = epsilon
         self.dist = dist
-        self.scale = scale
+
+        if scale is None:
+            self.scale = [-1, 1]
+        else:
+            self.scale = scale
 
     def generate(self, 
                  sample: Union[np.ndarray, torch.Tensor, tf.Tensor]) -> tf.Tensor:
@@ -41,10 +46,9 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
         else:
             raise ValueError(f"Unsupported distribution: {self.dist}")
         
-        if self.scale is not None:
-            current_min, current_max = tf.reduce_min(noise), tf.reduce_max(noise)
-            target_min, target_max = self.scale
-            noise = (noise - current_min) / (current_max - current_min) * (target_max - target_min) + target_min
+        current_min, current_max = tf.reduce_min(noise), tf.reduce_max(noise)
+        target_min, target_max = self.scale
+        noise = (noise - current_min) / (current_max - current_min) * (target_max - target_min) + target_min
         
         noise = tf.Variable(noise)
         return noise
@@ -52,8 +56,11 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
     def apply_noise(self, sample: tf.Tensor, noise: tf.Tensor) -> tf.Tensor:
         return sample + noise
 
-    def apply_constraints(self, tensor: tf.Tensor, min_val: float = -1.0, max_val: float = 1.0) -> tf.Tensor:
-        return tf.clip_by_value(tensor, clip_value_min=min_val, clip_value_max=max_val)
+    def apply_constraints(self, tensor: tf.Variable) -> tf.Variable:
+        min_value = self.scale[0] * self.epsilon
+        max_value = self.scale[1] * self.epsilon
+        tensor.assign(tf.clip_by_value(tensor, clip_value_min=min_value, clip_value_max=max_value))
+        return tensor
 
 
 class AdditiveNoiseGeneratorTorch(NoiseGenerator):
@@ -98,5 +105,11 @@ T = TypeVar('T', AdditiveNoiseGeneratorTF, AdditiveNoiseGeneratorTorch)
 
 
 class AdditiveNoiseGenerator(Generic[T], metaclass=NoiseGeneratorMeta):
-    def __init__(self, framework: Literal["torch", "tf"]) -> None:
+    def __init__(self, 
+                 framework: Literal["torch", "tf"], 
+                 use_constraints: bool,
+                 epsilon: float,
+                 scale: List[int] = None,
+                 dist: Literal["normal", "uniform"] = "normal") -> None:
         self.framework: Literal["torch", "tf"] = framework
+        self.use_constraints: bool = use_constraints

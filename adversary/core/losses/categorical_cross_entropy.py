@@ -14,28 +14,20 @@ class CategoricalCrossEntropy(Loss):
         super().__init__(framework)
 
     def calculate(self, 
-                  model: Union[torch.nn.Module, tf.keras.Model], 
-                  inputs: Union[torch.Tensor, tf.Tensor], 
+                  predictions: Union[torch.Tensor, tf.Tensor], 
                   targets: Union[torch.Tensor, tf.Tensor]):
-        return super().calculate(model, inputs, targets)
+        return super().calculate(predictions, targets)
 
     def torch_op(self, 
-                 model: torch.nn.Module, 
-                 inputs: torch.Tensor, 
+                 predictions: torch.Tensor, 
                  targets: torch.Tensor
-                 ) -> List[torch.Tensor]:
-        model.zero_grad()
-        outputs = model(inputs)
-        loss = self.loss.calculate(outputs, targets)
-        loss.backward()
-        return [param.grad for param in model.parameters() if param.grad is not None]
+                 ) -> torch.Tensor:
+        loss = F.cross_entropy(predictions, targets)
+        return loss
 
     def tf_op(self, 
-              model: tf.keras.Model, 
-              inputs: tf.Tensor, 
+              predictions: tf.Tensor, 
               targets: tf.Tensor
-              ) -> List[tf.Tensor]:
-        with tf.GradientTape() as tape:
-            outputs = model(inputs)
-            loss = self.loss.calculate(outputs, targets)
-        return tape.gradient(loss, model.trainable_variables)
+              ) -> tf.Tensor:
+        loss = categorical_crossentropy(targets, predictions)
+        return tf.reduce_mean(loss)

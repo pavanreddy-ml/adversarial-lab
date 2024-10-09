@@ -48,7 +48,14 @@ class GetGrads(GetGradsBase):
             
             input = noise_generator.apply_noise(sample, noise)
             outputs = model(input)
+
+            if len(targets.shape) == 1:
+                targets = tf.expand_dims(targets, axis=0)
+
             loss = self.loss.calculate(outputs, targets)
   
         gradients = tape.gradient(loss, noise)
+        if gradients.shape[0] == 1 and len(noise.shape) < len(gradients.shape):
+            gradients = tf.squeeze(gradients, axis=0)
+
         return gradients

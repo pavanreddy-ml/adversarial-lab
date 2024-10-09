@@ -31,6 +31,10 @@ class NoiseGeneratorMeta(ABCMeta):
         return super(NoiseGeneratorMeta, specific_class).__call__(*args, **kwargs)
     
 class NoiseGenerator(ABC):
+    def __init__(self, framework, use_constraints):
+        self.framework = framework
+        self.use_constraints = use_constraints
+
     @abstractmethod
     def generate(self, *args, **kwargs):
         pass

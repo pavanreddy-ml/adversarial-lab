@@ -8,7 +8,7 @@ from . import Optimizer
 class Adam(Optimizer):
     def __init__(self, 
                  framework: Literal["torch", "tf"],
-                 learning_rate: float = 0.001,
+                 learning_rate: float = 0.01,
                  beta1: float = 0.9,
                  beta2: float = 0.999,
                  epsilon: float = 1e-8
