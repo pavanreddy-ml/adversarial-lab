@@ -1,7 +1,10 @@
 from typing import Dict, Union
 
-import torch
+import random
 import numpy as np
+from tqdm import tqdm
+
+import torch
 import tensorflow as tf
 from torch.nn import Module as TorchModel
 from tensorflow.keras.models import Model as TFModel
@@ -31,6 +34,9 @@ class TargetedWhiteBoxAttack(WhiteBoxAttack):
                epochs=10,
                *args,
                **kwargs):
+        if target_class == -1:
+            target_class = random.randint(0, self.model_info["output_shape"][1] - 1)
+
         if target_vector is None:
             if target_class >= self.model_info["output_shape"][1]:
                 raise ValueError("target_class exceeds the dimension of the outputs.")

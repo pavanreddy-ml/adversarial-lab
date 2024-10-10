@@ -1,7 +1,9 @@
 from typing import Dict, Union, Literal
 
-import torch
 import numpy as np
+from tqdm import tqdm
+
+import torch
 import tensorflow as tf
 from torch.nn import Module as TorchModel
 from tensorflow.keras.models import Model as TFModel
@@ -27,7 +29,7 @@ class NonTargetedWhiteBoxAttack(WhiteBoxAttack):
 
     def attack(self,
                sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
-               strategy: Literal['minimize', 'spread', 'uniform'] = 'minimize',
+               strategy: Literal['minimize', 'spread', 'uniform', 'confuse'] = 'minimize',
                epochs=10,
                *args,
                **kwargs):
@@ -37,30 +39,18 @@ class NonTargetedWhiteBoxAttack(WhiteBoxAttack):
 
         preprocessed_sample = self.preprocessing.preprocess(sample)
         noise = self.noise_generator.generate(preprocessed_sample)
-        true_class = np.argmax(self.model.predict(preprocessed_sample), axis=1)
-
-        num_classes = self.model_info["output_shape"][1]
-        target_vector = np.zeros(shape=(num_classes, ))
-
-        if strategy == 'minimize':
-            target_vector = np.zeros(num_classes)
-            target_vector[self.true_class] = 1e-6
-
-        elif strategy == 'spread':
-            target_vector = np.ones(num_classes) / (num_classes - 1)
-            target_vector[self.true_class] = 1e-6
-            target_vector /= target_vector.sum()
-
-        elif strategy == 'uniform':
-            target_vector = np.ones(num_classes) / num_classes
-
-        target_vector = self.tensor_ops.to_tensor(target_vector)
-
-        if len(target_vector) != num_classes:
-            raise ValueError(
-                "target_vector must be the same size as the outputs.")
+        true_class = np.argmax(self.model.predict(
+            preprocessed_sample), axis=1)[0]
+        
+        target_vector = self._get_target_vector(
+                predictions, true_class, strategy)
 
         for _ in range(epochs):
+            predictions = self.model.predict(
+                self.noise_generator.apply_noise(preprocessed_sample, noise), verbose=0)
+            target_vector = self._get_target_vector(
+                predictions, true_class, strategy)
+
             gradients = self.get_grads.calculate(
                 self.model, preprocessed_sample, noise, self.noise_generator, target_vector)
             self.optimizer.apply([noise], [gradients])
@@ -72,3 +62,33 @@ class NonTargetedWhiteBoxAttack(WhiteBoxAttack):
                 preprocessed_sample, noise), verbose=0)[0][true_class])
 
         return noise.numpy()
+
+    def _get_target_vector(self,
+                           predictions: Union[np.ndarray, torch.Tensor, tf.Tensor],
+                           true_class: int,
+                           strategy: Literal['minimize', 'spread', 'uniform', 'confuse']
+                           ) -> Union[np.ndarray, torch.Tensor, tf.Tensor]:
+        num_classes = predictions.shape[1]
+
+        if strategy == 'minimize':
+            target_vector = predictions[1].copy()
+            target_vector[true_class] = 0
+            target_vector = target_vector / target_vector.sum()
+        elif strategy == 'spread':
+            target_vector = np.ones(num_classes) / (num_classes - 1)
+            target_vector[true_class] = 1e-6
+            target_vector /= target_vector.sum()
+        elif strategy == 'uniform':
+            target_vector = np.ones(num_classes) / num_classes
+        else:
+            raise ValueError(
+                "Invalid value for strategy. It must be 'minimize', 'spread', or 'uniform'.")
+
+        target_vector = np.expand_dims(target_vector, axis=0)
+        target_vector = self.tensor_ops.to_tensor(target_vector)
+
+        if predictions.shape != target_vector.shape:
+            raise ValueError(
+                "target_vector must be the same size as the outputs.")
+
+        return target_vector
