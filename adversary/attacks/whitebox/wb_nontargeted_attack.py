@@ -1,5 +1,6 @@
 from typing import Dict, Union, Literal
 
+import random
 import numpy as np
 from tqdm import tqdm
 
@@ -29,11 +30,11 @@ class NonTargetedWhiteBoxAttack(WhiteBoxAttack):
 
     def attack(self,
                sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
-               strategy: Literal['minimize', 'spread', 'uniform', 'confuse'] = 'minimize',
+               strategy: Literal['minimize', 'spread', 'uniform', 'random'] = 'minimize',
                epochs=10,
                *args,
                **kwargs):
-        if strategy not in ['minimize', 'spread', 'uniform']:
+        if strategy not in ['minimize', 'spread', 'uniform', 'random']:
             raise ValueError(
                 "Invalid value for strategy. It must be 'ignore', 'distribute', or 'uniform'.")
 
@@ -42,14 +43,19 @@ class NonTargetedWhiteBoxAttack(WhiteBoxAttack):
         true_class = np.argmax(self.model.predict(
             preprocessed_sample), axis=1)[0]
         
+        predictions = self.model.predict(
+                self.noise_generator.apply_noise(preprocessed_sample, noise), verbose=0)
         target_vector = self._get_target_vector(
-                predictions, true_class, strategy)
+            predictions, true_class, strategy)
+        
+        random_class = np.argmax(target_vector, axis=1)[0]
 
         for _ in range(epochs):
-            predictions = self.model.predict(
-                self.noise_generator.apply_noise(preprocessed_sample, noise), verbose=0)
-            target_vector = self._get_target_vector(
-                predictions, true_class, strategy)
+            if strategy == 'minimize':
+                predictions = self.model.predict(
+                    self.noise_generator.apply_noise(preprocessed_sample, noise), verbose=0)
+                target_vector = self._get_target_vector(
+                    predictions, true_class, strategy)
 
             gradients = self.get_grads.calculate(
                 self.model, preprocessed_sample, noise, self.noise_generator, target_vector)
@@ -60,13 +66,15 @@ class NonTargetedWhiteBoxAttack(WhiteBoxAttack):
             # Dev Only. Remove in Release
             print(self.model.predict(self.noise_generator.apply_noise(
                 preprocessed_sample, noise), verbose=0)[0][true_class])
+            print(self.model.predict(self.noise_generator.apply_noise(
+                preprocessed_sample, noise), verbose=0)[0][random_class])
 
         return noise.numpy()
 
     def _get_target_vector(self,
                            predictions: Union[np.ndarray, torch.Tensor, tf.Tensor],
                            true_class: int,
-                           strategy: Literal['minimize', 'spread', 'uniform', 'confuse']
+                           strategy: Literal['minimize', 'spread', 'uniform', 'random']
                            ) -> Union[np.ndarray, torch.Tensor, tf.Tensor]:
         num_classes = predictions.shape[1]
 
@@ -80,9 +88,10 @@ class NonTargetedWhiteBoxAttack(WhiteBoxAttack):
             target_vector /= target_vector.sum()
         elif strategy == 'uniform':
             target_vector = np.ones(num_classes) / num_classes
-        else:
-            raise ValueError(
-                "Invalid value for strategy. It must be 'minimize', 'spread', or 'uniform'.")
+        elif strategy == 'random':
+            random_class = random.choice([i for i in range(num_classes) if i != true_class])
+            target_vector = np.zeros(shape=(num_classes, ))
+            target_vector[random_class] = 1
 
         target_vector = np.expand_dims(target_vector, axis=0)
         target_vector = self.tensor_ops.to_tensor(target_vector)
