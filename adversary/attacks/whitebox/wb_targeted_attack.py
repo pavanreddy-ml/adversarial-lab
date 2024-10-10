@@ -1,14 +1,18 @@
 from typing import Dict, Union
-from torch.nn import Module as TorchModel
-from adversary.core.losses.loss_base import Loss
-from adversary.core.optimizers.optimizer_base import Optimizer
-from adversary.core.noise_generators import NoiseGenerator
-from tensorflow.keras.models import Model as TFModel
-import tensorflow as tf
-from . import WhiteBoxAttack
-import torch
 
+import random
 import numpy as np
+from tqdm import tqdm
+
+import torch
+import tensorflow as tf
+from torch.nn import Module as TorchModel
+from tensorflow.keras.models import Model as TFModel
+
+from . import WhiteBoxAttack
+from adversary.core.losses.loss_base import Loss
+from adversary.core.noise_generators import NoiseGenerator
+from adversary.core.optimizers.optimizer_base import Optimizer
 
 
 class TargetedWhiteBoxAttack(WhiteBoxAttack):
@@ -30,6 +34,9 @@ class TargetedWhiteBoxAttack(WhiteBoxAttack):
                epochs=10,
                *args,
                **kwargs):
+        if target_class == -1:
+            target_class = random.randint(0, self.model_info["output_shape"][1] - 1)
+
         if target_vector is None:
             if target_class >= self.model_info["output_shape"][1]:
                 raise ValueError("target_class exceeds the dimension of the outputs.")
@@ -51,7 +58,6 @@ class TargetedWhiteBoxAttack(WhiteBoxAttack):
             if self.noise_generator.use_constraints:
                 noise = self.noise_generator.apply_constraints(noise)
 
-            preprocessed_sample
             # Dev Only. Remove in Release
             print(self.model.predict(self.noise_generator.apply_noise(preprocessed_sample, noise), verbose=0)[0][target_class])
 
