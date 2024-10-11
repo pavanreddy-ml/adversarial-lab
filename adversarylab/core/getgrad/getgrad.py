@@ -1,6 +1,6 @@
 from . import GetGradsBase
-from adversary.core.noise_generators import NoiseGenerator
-from adversary.core.losses import Loss
+from adversarylab.core.noise_generators import NoiseGenerator
+from adversarylab.core.losses import Loss
 
 from typing import Literal, List, Union
 
