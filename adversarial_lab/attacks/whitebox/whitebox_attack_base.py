@@ -7,13 +7,13 @@ import tensorflow as tf
 from torch.nn import Module as TorchModel
 from tensorflow.keras.models import Model as TFModel
 
-from adversarylab.core.getgrad import GetGrads
-from adversarylab.core.modelinfo import ModelInfo
-from adversarylab.core.tensor_ops import TensorOps
-from adversarylab.core.losses import Loss, LossRegistry
-from adversarylab.core.optimizers import Optimizer, OptimizerRegistry
-from adversarylab.core.preprocessing import NoPreprocessing, Preprocessing
-from adversarylab.core.noise_generators import AdditiveNoiseGenerator, NoiseGenerator
+from adversarial_lab.core.getgrad import GetGrads
+from adversarial_lab.core.modelinfo import ModelInfo
+from adversarial_lab.core.tensor_ops import TensorOps
+from adversarial_lab.core.losses import Loss, LossRegistry
+from adversarial_lab.core.optimizers import Optimizer, OptimizerRegistry
+from adversarial_lab.core.preprocessing import NoPreprocessing, Preprocessing
+from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator, NoiseGenerator
 
 class WhiteBoxAttack(ABC):
     def __init__(self, 

@@ -10,9 +10,9 @@ from torch.nn import Module as TorchModel
 from tensorflow.keras.models import Model as TFModel
 
 from . import WhiteBoxAttack
-from adversarylab.core.losses.loss_base import Loss
-from adversarylab.core.noise_generators import NoiseGenerator
-from adversarylab.core.optimizers.optimizer_base import Optimizer
+from adversarial_lab.core.losses.loss_base import Loss
+from adversarial_lab.core.noise_generators import NoiseGenerator
+from adversarial_lab.core.optimizers.optimizer_base import Optimizer
 
 
 class NonTargetedWhiteBoxAttack(WhiteBoxAttack):
