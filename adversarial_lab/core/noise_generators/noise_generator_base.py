@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import tensorflow as tf
 import importlib
+from adversarial_lab.core.optimizers import Optimizer
 
 
 class NoiseGeneratorMeta(ABCMeta):
@@ -28,7 +29,14 @@ class NoiseGeneratorMeta(ABCMeta):
         except (ImportError, AttributeError) as e:
             raise ValueError(f"Class {specific_class_name} not found in module {module_name}. Ensure it is defined.") from e
 
-        return super(NoiseGeneratorMeta, specific_class).__call__(*args, **kwargs)
+        instance = super(NoiseGeneratorMeta, specific_class).__call__(*args, **kwargs)
+
+        if framework == "torch":
+            instance.apply_gradients = instance.apply_gradients_torch
+        elif framework == "tf":
+            instance.apply_gradients = instance.apply_gradients_tf
+
+        return instance
     
 class NoiseGenerator(ABC):
     def __init__(self, framework, use_constraints):
@@ -46,3 +54,24 @@ class NoiseGenerator(ABC):
     @abstractmethod
     def apply_constraints(self, *args, **kwargs):
         pass
+
+    def apply_gradients(self, 
+                        tensor: tf.Variable, 
+                        gradients: tf.Tensor,
+                        optimizer: Optimizer
+                        ) -> None:
+        pass
+
+    def apply_gradients_tf(self, 
+                        tensor: tf.Variable, 
+                        gradients: tf.Tensor,
+                        optimizer: Optimizer
+                        ) -> None:
+        optimizer.apply([tensor], [gradients])
+
+    def apply_gradients_torch(self, 
+                        tensor: torch.Tensor, 
+                        gradients: torch.Tensor,
+                        optimizer: Optimizer
+                        ) -> None:
+        raise NotImplementedError("apply_gradients_torch is not implemented yet.")

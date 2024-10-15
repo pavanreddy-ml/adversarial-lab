@@ -12,10 +12,10 @@
 
 <p align="center">
   <a href="#key-features">Key Features</a> •
-  <a href="#how-to-use">Installation</a> •
-  <a href="#download">Quick Start</a> •
-  <a href="#credits">Usage</a> •
-  <a href="#related">Customization</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#customization">Customization</a> •
   <a href="#contributing">Contributing</a> •
   <a href="#license">License</a>
 </p>

@@ -1,4 +1,4 @@
-from . import exceptions
+from .exceptions import *
 
 
-__all__ = [name for name in dir(exceptions) if not name.startswith("_")]
+__all__ = ["IncompatibilityError", "VectorDimensionsError", "IndifferentiabilityError"]
