@@ -22,7 +22,6 @@ class BinaryCrossEntropy(Loss):
                  predictions: torch.Tensor, 
                  targets: torch.Tensor
                  ) -> torch.Tensor:
-        predictions = torch.sigmoid(predictions)
         loss = F.binary_cross_entropy(predictions, targets)
         return loss
 
