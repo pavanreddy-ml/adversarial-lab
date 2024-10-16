@@ -25,7 +25,6 @@
 
 - **Framework Agnostic:** Works seamlessly with both TensorFlow and PyTorch.
 - **Wide Range of Attacks:** Includes both black-box and white-box attack implementations.
-- **Gradient Manipulation:** Advanced techniques for manipulating gradients.
 - **Customizable Loss Functions and Optimizers:** Easily extendable to custom loss functions and optimization techniques.
 - **Noise Generators:** Supports various noise generation methods to craft adversarial examples.
 - **Defenses:** Built-in methods to evaluate and defend against adversarial attacks.
@@ -43,7 +42,16 @@ pip install adversarial-lab
 Here's a basic example to get you started with a white-box attack on a PyTorch model:
 
 ```python
+from PIL import Image
+import tensorflow as tf
+from tensorflow.keras.applications import InceptionV3
+from adversarial_lab.attacks.whitebox import WhiteBoxMisclassification
 
+image = Image.open('data/panda.jpg')
+model = InceptionV3(weights='imagenet')
+
+attacker = WhiteBoxMisclassification(model, "cce", "adam")
+noise = attacker.attack(image_array, epochs=20, strategy="random", verbose=3)
 ```
 
 ## Usage
@@ -57,7 +65,7 @@ Adversarial Lab supports a variety of adversarial attack techniques. Here's a br
 
 ### Defenses
 
-Built-in defenses can be found under `adversarial_lab/defenses`. These modules provide methods to protect models against adversarial attacks by applying techniques such as noise filtering and gradient masking.
+COMING SOON
 
 ## Customization
 
