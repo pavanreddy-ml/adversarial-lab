@@ -1,11 +1,13 @@
 from typing import Literal, List, Union, TypeVar, Generic
-from . import NoiseGenerator, NoiseGeneratorMeta
 
 import torch
+import numpy as np
 import tensorflow as tf
 from torch.nn import functional as F
 
-import numpy as np
+from . import NoiseGenerator, NoiseGeneratorMeta
+from adversarial_lab.core.optimizers import Optimizer
+
 
 class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
     def __init__(self,
@@ -29,7 +31,8 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
             self.scale = scale
 
     def generate(self, 
-                 sample: Union[np.ndarray, torch.Tensor, tf.Tensor]) -> tf.Tensor:
+                 sample: Union[np.ndarray, torch.Tensor, tf.Tensor]
+                 ) -> tf.Tensor:
 
         if not isinstance(sample, (np.ndarray, torch.Tensor, tf.Tensor)):
             raise TypeError("Input must be of type np.ndarray, torch.Tensor, or tf.Tensor")
@@ -53,10 +56,15 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
         noise = tf.Variable(noise)
         return noise
     
-    def apply_noise(self, sample: tf.Tensor, noise: tf.Tensor) -> tf.Tensor:
+    def apply_noise(self, 
+                    sample: tf.Tensor, 
+                    noise: tf.Tensor
+                    ) -> tf.Tensor:
         return sample + noise
 
-    def apply_constraints(self, tensor: tf.Variable) -> tf.Variable:
+    def apply_constraints(self, 
+                          tensor: tf.Variable
+                          ) -> tf.Variable:
         min_value = self.scale[0] * self.epsilon
         max_value = self.scale[1] * self.epsilon
         tensor.assign(tf.clip_by_value(tensor, clip_value_min=min_value, clip_value_max=max_value))
