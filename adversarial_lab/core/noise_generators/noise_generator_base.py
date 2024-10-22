@@ -39,7 +39,9 @@ class NoiseGeneratorMeta(ABCMeta):
         return instance
     
 class NoiseGenerator(ABC):
-    def __init__(self, framework, use_constraints):
+    def __init__(self, 
+                 framework: Literal["torch", "tf"],
+                 use_constraints: bool):
         self.framework = framework
         self.use_constraints = use_constraints
 
@@ -63,10 +65,12 @@ class NoiseGenerator(ABC):
         pass
 
     def apply_gradients_tf(self, 
-                        tensor: tf.Variable, 
+                        tensor: tf.Variable | List[tf.Variable], 
                         gradients: tf.Tensor,
                         optimizer: Optimizer
                         ) -> None:
+        if isinstance(tensor, list):
+            optimizer.apply(tensor, [gradients])
         optimizer.apply([tensor], [gradients])
 
     def apply_gradients_torch(self, 

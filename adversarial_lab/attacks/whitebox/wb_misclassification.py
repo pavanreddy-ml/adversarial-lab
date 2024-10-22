@@ -144,16 +144,15 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             if strategy not in ['spread', 'uniform', 'random']:
                 raise ValueError("Invalid value for strategy. It must be 'spread', 'uniform', 'random'.")
             target_vector = self._get_target_vector(predictions, true_class, strategy)
-
-
+        
         for _ in range(epochs):
+            self.noise_generator
             gradients, loss = self.get_grads.calculate(self.model, preprocessed_sample, noise, self.noise_generator, target_vector)
             if gradients is None:
                 raise IndifferentiabilityError()
 
             self.noise_generator.apply_gradients(noise, gradients, self.optimizer)
-            if self.noise_generator.use_constraints:
-                noise = self.noise_generator.apply_constraints(noise)
+            noise = self.noise_generator.apply_constraints(noise)
 
             # Stats
             predictions = self.model.predict(self.noise_generator.apply_noise(preprocessed_sample, noise), verbose=0)

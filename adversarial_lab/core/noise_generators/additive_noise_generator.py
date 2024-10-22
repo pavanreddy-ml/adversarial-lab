@@ -31,12 +31,12 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
             self.scale = scale
 
     def generate(self, 
-                 sample: Union[np.ndarray, torch.Tensor, tf.Tensor]
+                 sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
                  ) -> tf.Tensor:
 
         if not isinstance(sample, (np.ndarray, torch.Tensor, tf.Tensor)):
             raise TypeError("Input must be of type np.ndarray, torch.Tensor, or tf.Tensor")
-
+        
         shape = sample.shape
         if shape[0] is None:
             shape = shape[1:]
@@ -65,6 +65,8 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
     def apply_constraints(self, 
                           tensor: tf.Variable
                           ) -> tf.Variable:
+        if not self.use_constraints:
+            return tensor
         min_value = self.scale[0] * self.epsilon
         max_value = self.scale[1] * self.epsilon
         tensor.assign(tf.clip_by_value(tensor, clip_value_min=min_value, clip_value_max=max_value))
