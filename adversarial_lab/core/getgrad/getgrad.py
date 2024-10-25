@@ -7,6 +7,7 @@ import tensorflow as tf
 from adversarial_lab.core.losses import Loss
 from adversarial_lab.core.getgrad import GetGradsBase
 from adversarial_lab.core.noise_generators import NoiseGenerator
+from adversarial_lab.exceptions import IndifferentiabilityError
 
 
 class GetGrads(GetGradsBase):
@@ -64,10 +65,10 @@ class GetGrads(GetGradsBase):
     def tf_op(self,
           model: tf.keras.Model,
           sample: tf.Tensor,
-          noise: tf.Tensor,
+          noise: List[tf.Tensor],
           noise_generator: NoiseGenerator,
           targets: tf.Tensor
-          ) -> Tuple[tf.Tensor, float]:
+          ) -> Tuple[List[tf.Tensor], float]:
         """
         Calculate gradients and return them along with the scalar loss.
 
@@ -89,11 +90,11 @@ class GetGrads(GetGradsBase):
         Tuple[tf.Tensor, float]
             A tuple containing the gradients (tf.Tensor) and the scalar loss value (float).
         """
-        noise = tf.Variable(noise, trainable=True)
-
+        
         with tf.GradientTape() as tape:
-            tape.watch(noise)
-            
+            noise = [tf.Variable(n, trainable=True) for n in noise]
+            for n in noise:
+                tape.watch(n)
             input = noise_generator.apply_noise(sample, noise)
             outputs = model(input)
             if len(targets.shape) == 1:
@@ -101,7 +102,9 @@ class GetGrads(GetGradsBase):
             loss = self.loss.calculate(outputs, targets)
   
         gradients = tape.gradient(loss, noise)
-        if gradients.shape[0] == 1 and len(noise.shape) < len(gradients.shape):
-            gradients = tf.squeeze(gradients, axis=0)
-
+        if gradients is None:
+            raise IndifferentiabilityError()
+        
+        gradients = [tf.squeeze(grad, axis=0) if grad.shape[0] == 1 and len(n.shape) < len(grad.shape) else grad 
+                    for grad, n in zip(gradients, noise)]
         return gradients, tf.reduce_mean(loss).numpy().item()

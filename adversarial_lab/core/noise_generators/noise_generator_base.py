@@ -63,15 +63,19 @@ class NoiseGenerator(ABC):
                         optimizer: Optimizer
                         ) -> None:
         pass
+    
+    def get_noise(self, 
+                  noise_components: List[tf.Tensor | tf.Variable]
+                  ) -> np.ndarray:
+        noise = tf.add_n(noise_components)
+        return noise.numpy()
 
     def apply_gradients_tf(self, 
-                        tensor: tf.Variable | List[tf.Variable], 
-                        gradients: tf.Tensor,
+                        tensor: List[tf.Variable], 
+                        gradients: List[tf.Variable],
                         optimizer: Optimizer
                         ) -> None:
-        if isinstance(tensor, list):
-            optimizer.apply(tensor, [gradients])
-        optimizer.apply([tensor], [gradients])
+        optimizer.apply(tensor, gradients)
 
     def apply_gradients_torch(self, 
                         tensor: torch.Tensor, 
