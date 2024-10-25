@@ -31,12 +31,12 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
             self.scale = scale
 
     def generate(self, 
-                 sample: Union[np.ndarray, torch.Tensor, tf.Tensor]
-                 ) -> tf.Tensor:
+                 sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
+                 ) -> List[tf.Tensor]:
 
         if not isinstance(sample, (np.ndarray, torch.Tensor, tf.Tensor)):
             raise TypeError("Input must be of type np.ndarray, torch.Tensor, or tf.Tensor")
-
+        
         shape = sample.shape
         if shape[0] is None:
             shape = shape[1:]
@@ -54,7 +54,7 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
         noise = (noise - current_min) / (current_max - current_min) * (target_max - target_min) + target_min
         
         noise = tf.Variable(noise)
-        return noise
+        return [noise]
     
     def apply_noise(self, 
                     sample: tf.Tensor, 
@@ -63,12 +63,16 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
         return sample + noise
 
     def apply_constraints(self, 
-                          tensor: tf.Variable
-                          ) -> tf.Variable:
-        min_value = self.scale[0] * self.epsilon
-        max_value = self.scale[1] * self.epsilon
-        tensor.assign(tf.clip_by_value(tensor, clip_value_min=min_value, clip_value_max=max_value))
-        return tensor
+                          noise: List[tf.Variable]
+                          ) -> List[tf.Variable]:
+        if not self.use_constraints:
+            return noise
+        for i in range(len(noise)):
+            min_value = self.scale[0] * self.epsilon
+            max_value = self.scale[1] * self.epsilon
+            noise[i].assign(tf.clip_by_value(noise[i], clip_value_min=min_value, clip_value_max=max_value))
+        return noise
+        
 
 
 class AdditiveNoiseGeneratorTorch(NoiseGenerator):
@@ -81,11 +85,14 @@ class AdditiveNoiseGeneratorTorch(NoiseGenerator):
         self.epsilon = epsilon
         self.dist = dist
 
-        self.scale = scale
+        if scale is None:
+            self.scale = [-1, 1]
+        else:
+            self.scale = scale
 
     def generate(self, 
                  shape: List[int]
-                 ) -> torch.Tensor:
+                 ) -> List[torch.Tensor]:
         if self.dist == "normal":
             noise = torch.randn(shape, device='cuda' if torch.cuda.is_available() else 'cpu')
             noise = torch.clamp(noise, -1, 1) * self.epsilon
@@ -100,7 +107,7 @@ class AdditiveNoiseGeneratorTorch(NoiseGenerator):
             target_min, target_max = self.scale
             noise = (noise - current_min) / (current_max - current_min) * (target_max - target_min) + target_min
         
-        return noise
+        return [noise]
     
     def apply_noise(self, *args, **kwargs):
         raise NotImplementedError("Apply Noise Not Implemented for Torch")
