@@ -1,14 +1,16 @@
 from typing import Literal, List, Union, TypeVar, Generic
 
 import torch
+import warnings
 import numpy as np
 import tensorflow as tf
 from torch.nn import functional as F
 
 from . import NoiseGenerator, NoiseGeneratorMeta
-from .additive_noise_generator import AdditiveNoiseGeneratorTF, AdditiveNoiseGeneratorTorch
-from adversarial_lab.core.optimizers import Optimizer
 from adversarial_lab.exceptions import IncompatibilityError
+from adversarial_lab.core.tensor_ops import TensorOps
+from adversarial_lab.core.optimizers import Optimizer
+from .additive_noise_generator import AdditiveNoiseGeneratorTF, AdditiveNoiseGeneratorTorch
 
 
 class BoundedNoiseGeneratorTF(AdditiveNoiseGeneratorTF):
@@ -22,85 +24,111 @@ class BoundedNoiseGeneratorTF(AdditiveNoiseGeneratorTF):
                  ) -> None:
         super().__init__(framework, use_constraints, epsilon, scale, dist)
 
-        self._bounds = None
+        self.tensor_ops = TensorOps(framework)
+
+        self._mask = None
         self._strict = strict
 
     def generate(self,
                  sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
                  bounds: List[List[int]] = None
                  ) -> tf.Tensor:
-
-        if not isinstance(sample, (np.ndarray, torch.Tensor, tf.Tensor)):
-            raise TypeError(
-                "Input must be of type np.ndarray, torch.Tensor, or tf.Tensor")
+        noise = super(BoundedNoiseGeneratorTF, self).generate(sample)
 
         shape = sample.shape
         if shape[0] is None or shape[0] == 1:
             shape = shape[1:]
 
-        if self._bounds is None and bounds is None:
-            if len(shape) == 1:                             # For 1d Samples
-                bounds = [[0, 0, shape[0], 1]]
-            elif len(shape) >= 2:                            # For 2d Samples (Greyscale and 3 channel)
-                bounds = [[0, 0, shape[0], shape[1]]]
+        if self._mask is None and bounds is None:
+            bounds = [0] * len(shape) + list(shape)
+            bounds = [bounds]
+            self._set_mask(bounds)
 
-            self.set_bounds(bounds)
-    
-        noise = [super(BoundedNoiseGeneratorTF, self).generate(sample)[0] for _ in range(len(self._bounds))]
+        noise[0].assign(noise[0] * self._mask)
         self.apply_constraints(noise)
         return noise
 
-    def apply_noise(self, 
-                    sample: Union[tf.Tensor, tf.Variable], 
+    def apply_noise(self,
+                    sample: Union[tf.Tensor, tf.Variable],
                     noise: List[tf.Variable]) -> tf.Tensor:
-        for i in range(len(noise)):
-            sample = sample + noise[i]
-        return sample
-
-    def apply_constraints(self, 
-                          noise: List[tf.Variable]
-                          ) -> List[tf.Variable]:
-        noise = super().apply_constraints(noise)
-        for i, noise_tensor in enumerate(noise):
-            shape = noise_tensor.shape
-            if shape[0] == 1 or shape[0] == None:
-                    shape = shape[1:]
-            x, y, w, h = self._bounds[i]
-            mask = np.zeros(shape)
-            mask[y:y+h, x:x+w] = 1
-            mask = tf.convert_to_tensor(mask, dtype=tf.float32)
-            noise_tensor.assign(noise_tensor * mask)
-        return noise
+        return sample + (self._mask * noise[0])
 
     def set_bounds(self,
-                    bounds: List[List[int]]
-                    ) -> None:
-        if self._bounds is None:
-            self._bounds = bounds
-        elif not self._strict and self._bounds is not None:
-            Warning("Bounds are already set. Overwriting bounds.")
-            self._bounds = bounds
-        elif self._strict and self._bounds is not None:
-            raise AttributeError("Bounds are already set. Create a new instance of BoundedNoiseGenerator to set new bounds.")
+                   sample: Union[np.ndarray, tf.Tensor],
+                   bounds: List[List[int]]
+                   ) -> None:
+        if self._mask is None:
+            self._set_mask(sample, bounds)
+        elif not self._strict and self._mask is not None:
+            warnings.warn(
+                "Bounds are already set. Overwriting bounds. Not running in strict mode may lead to unexpected behavior.")
+            self._set_mask(sample, bounds)
+        elif self._strict and self._mask is not None:
+            raise AttributeError(
+                "Bounds are already set. Create a new instance of BoundedNoiseGenerator to set new bounds.")
 
-    def get_bounds(self) -> List[List[int]]:
-        return self._bounds
+    def get_mask(self) -> Union[np.ndarray, tf.Tensor]:
+        return self._mask
 
-    def _validate_bounds(self, noise: List[tf.Tensor]) -> None:
+    def set_custom_mask(self,
+                        sample: Union[np.ndarray, tf.Tensor],
+                        mask: Union[np.ndarray, tf.Tensor],
+                        threshold: float = 0.5
+                        ) -> None:
+        sample_shape = sample.shape
+        mask_shape = mask.shape
+
+        if len(sample_shape) != len(mask_shape):
+            raise ValueError(f"Sample and mask must have the same number of dimensions. "
+                             f"Got sample dimensions: {len(sample_shape)} and mask dimensions: {len(mask_shape)}")
+
+        mask_np = mask.numpy() if isinstance(mask, tf.Tensor) else mask
+
+        mask_resized = tf.image.resize(
+            mask_np, sample_shape[:2], method="nearest").numpy()
+        mask_normalized = (mask_resized - mask_resized.min()) / \
+            (mask_resized.max() - mask_resized.min())
+        mask_binary = (mask_normalized >= threshold).astype(np.uint8)
+        self._mask = self.tensor_ops.to_tensor(mask_binary)
+
+    def _set_mask(self,
+                  sample: Union[np.ndarray, tf.Tensor],
+                  bounds: List[List[int]]
+                  ) -> None:
+        shape = sample.shape
+        if shape[0] is None or shape[0] == 1:
+            shape = shape[1:]
+
+        mask = np.zeros(shape, dtype=np.uint8)
+        n_dims = len(shape)
+
+        for bound in bounds:
+            slices = tuple(
+                slice(bound[i], bound[i] + bound[n_dims + i]) for i in range(n_dims))
+            mask[slices] = 1
+
+        self._mask = self.tensor_ops.to_tensor(mask)
+
+    def _validate_bounds(self,
+                         sample: Union[np.ndarray, tf.Tensor],
+                         noise: List[tf.Tensor]
+                         ) -> None:
         pass
 
 
-class BoundedNoiseGeneratorTorch(NoiseGenerator):
+class BoundedNoiseGeneratorTorch(AdditiveNoiseGeneratorTorch):
     def __init__(self,
                  framework: Literal["torch", "tf"],
+                 use_constraints: bool,
                  epsilon: float,
                  scale: List[int] = None,
-                 dist: Literal["normal", "uniform"] = "normal"
+                 dist: Literal["normal", "uniform"] = "normal",
+                 strict: bool = True
                  ) -> None:
-        self.epsilon = epsilon
-        self.dist = dist
+        self.tensor_ops = TensorOps(framework)
 
-        self.scale = scale
+        self._mask = None
+        self._strict = strict
 
     def generate(self,
                  shape: List[int]
