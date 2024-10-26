@@ -32,7 +32,7 @@ class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
 
     def generate(self, 
                  sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
-                 ) -> List[tf.Tensor]:
+                 ) -> List[tf.Variable]:
 
         if not isinstance(sample, (np.ndarray, torch.Tensor, tf.Tensor)):
             raise TypeError("Input must be of type np.ndarray, torch.Tensor, or tf.Tensor")
