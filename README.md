@@ -8,7 +8,7 @@
   <br>
 </h1>
 
-<p align="center">Adversarial Lab is a comprehensive Python library designed for launching adversarial attacks on any machine learning model. It is framework-agnostic, supporting both TensorFlow and PyTorch, making it a versatile tool for evaluating model robustness in different environments.</p>
+<p align="center">Adversarial Lab is a unified Python library for launching adversarial attacks on any machine learning model. It is framework-agnostic, supporting both TensorFlow and PyTorch.</p>
 
 <p align="center">
   <a href="#key-features">Key Features</a> •

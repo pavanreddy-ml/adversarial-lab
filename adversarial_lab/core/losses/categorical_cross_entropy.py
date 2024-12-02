@@ -23,6 +23,7 @@ class CategoricalCrossEntropy(Loss):
                  targets: torch.Tensor
                  ) -> torch.Tensor:
         loss = F.cross_entropy(predictions, targets)
+        self.set_value(loss)
         return loss
 
     def tf_op(self, 
@@ -30,4 +31,6 @@ class CategoricalCrossEntropy(Loss):
               targets: tf.Tensor
               ) -> tf.Tensor:
         loss = categorical_crossentropy(targets, predictions)
-        return tf.reduce_mean(loss)
+        loss = tf.reduce_mean(loss)
+        self.set_value(loss)
+        return loss

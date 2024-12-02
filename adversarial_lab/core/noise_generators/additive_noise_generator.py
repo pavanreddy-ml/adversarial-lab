@@ -1,130 +1,114 @@
-from typing import Literal, List, Union, TypeVar, Generic
+from typing import Literal, List, Union, TypeVar, Generic, Dict, Any, Tuple, Union
 
 import torch
+import warnings
 import numpy as np
 import tensorflow as tf
 from torch.nn import functional as F
 
-from . import NoiseGenerator, NoiseGeneratorMeta
+from adversarial_lab.core.tensor_ops import TensorOps
 from adversarial_lab.core.optimizers import Optimizer
+from adversarial_lab.exceptions import IncompatibilityError
+from .noise_generator_base import NoiseGenerator, NoiseGeneratorMeta
+from adversarial_lab.core.constraints import PostOptimizationConstraint
 
-
-class AdditiveNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
+class AdditiveNoiseGeneratorTF(NoiseGenerator):
     def __init__(self,
                  framework: Literal["torch", "tf"],
-                 use_constraints: bool,
-                 epsilon: float,
-                 scale: List[int] = None,
-                 dist: Literal["normal", "uniform"] = "normal"
+                 scale: List[int] = (-1, 1),
+                 dist: Literal["normal", "uniform"] = "normal",
+                 bounds: List[List[int]] = None,
+                 bounds_type: Literal["relative", "absolute"] = "relative",
+                 custom_mask: Union[np.ndarray, tf.Tensor] = None,
+                 constraints: List[PostOptimizationConstraint] = None,
+                 *args,
+                 **kwargs
                  ) -> None:
-        super().__init__(framework, use_constraints)
+        super().__init__(framework=framework,
+                         bounds=bounds,
+                         bounds_type=bounds_type,
+                         custom_mask=custom_mask,
+                         constraints=constraints)
 
-        if epsilon < 0 or epsilon > 1:
-            raise ValueError("Epsilon must be between 0 and 1")
-
-        self.epsilon = epsilon
         self.dist = dist
+        self.scale = scale
 
-        if scale is None:
-            self.scale = [-1, 1]
-        else:
-            self.scale = scale
-
-    def generate(self, 
-                 sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
-                 ) -> List[tf.Variable]:
-
-        if not isinstance(sample, (np.ndarray, torch.Tensor, tf.Tensor)):
-            raise TypeError("Input must be of type np.ndarray, torch.Tensor, or tf.Tensor")
-        
+    def generate_noise_meta(self,
+                               sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
+                               bounds: List[List[int]] = None
+                               ) -> tf.Variable:
+        super().generate_noise_meta(sample, bounds)
+    
         shape = sample.shape
-        if shape[0] is None:
+        if shape[0] is None or shape[0] == 1:
             shape = shape[1:]
-        
+
         if self.dist == "normal":
-            noise = tf.random.normal(shape)
-            noise = tf.clip_by_value(noise, -1, 1) * self.epsilon
+            noise_meta = tf.random.normal(shape)
+            noise_meta = self.scale[0] + (self.scale[1] - self.scale[0]) * (noise_meta - tf.reduce_min(noise_meta)) / (tf.reduce_max(noise_meta) - tf.reduce_min(noise_meta))
         elif self.dist == "uniform":
-            noise = tf.random.uniform(shape, minval=-1, maxval=1) * self.epsilon
+            noise_meta = tf.random.uniform(shape, minval=self.scale[0], maxval=self.scale[1])
         else:
             raise ValueError(f"Unsupported distribution: {self.dist}")
-        
-        current_min, current_max = tf.reduce_min(noise), tf.reduce_max(noise)
-        target_min, target_max = self.scale
-        noise = (noise - current_min) / (current_max - current_min) * (target_max - target_min) + target_min
-        
-        noise = tf.Variable(noise)
-        return [noise]
-    
-    def apply_noise(self, 
-                    sample: tf.Tensor, 
-                    noise: tf.Tensor
-                    ) -> tf.Tensor:
-        return sample + noise
 
-    def apply_constraints(self, 
-                          noise: List[tf.Variable]
-                          ) -> List[tf.Variable]:
-        if not self.use_constraints:
-            return noise
-        for i in range(len(noise)):
-            min_value = self.scale[0] * self.epsilon
-            max_value = self.scale[1] * self.epsilon
-            noise[i].assign(tf.clip_by_value(noise[i], clip_value_min=min_value, clip_value_max=max_value))
-        return noise
-        
+        noise_meta = tf.Variable(noise_meta)
+
+        noise_meta.assign(noise_meta * self._mask)
+        self.apply_constraints(noise_meta)
+
+        return [noise_meta]
+    
+    def get_noise(self,
+                  noise_meta: List[tf.Variable]
+                  ) -> np.ndarray:
+        return noise_meta[0].numpy()
+
+    def apply_noise(self,
+                    sample: tf.Tensor | tf.Variable,
+                    noise_meta: List[tf.Variable]
+                    ) -> tf.Tensor:
+        return sample + (self._mask * noise_meta[0])
+
 
 
 class AdditiveNoiseGeneratorTorch(NoiseGenerator):
     def __init__(self,
                  framework: Literal["torch", "tf"],
+                 use_constraints: bool,
                  epsilon: float,
                  scale: List[int] = None,
-                 dist: Literal["normal", "uniform"] = "normal"
+                 dist: Literal["normal", "uniform"] = "normal",
+                 strict: bool = True,
+                 *args,
+                 **kwargs
                  ) -> None:
-        self.epsilon = epsilon
-        self.dist = dist
+        self.tensor_ops = TensorOps(framework)
 
-        if scale is None:
-            self.scale = [-1, 1]
-        else:
-            self.scale = scale
+        self._mask = None
+        self._strict = strict
 
-    def generate(self, 
+    def generate(self,
                  shape: List[int]
-                 ) -> List[torch.Tensor]:
-        if self.dist == "normal":
-            noise = torch.randn(shape, device='cuda' if torch.cuda.is_available() else 'cpu')
-            noise = torch.clamp(noise, -1, 1) * self.epsilon
-        elif self.dist == "uniform":
-            noise = torch.rand(shape, device='cuda' if torch.cuda.is_available() else 'cpu') * 2 - 1
-            noise *= self.epsilon
-        else:
-            raise ValueError(f"Unsupported distribution: {self.dist}")
-        
-        if self.scale is not None:
-            current_min, current_max = noise.min(), noise.max()
-            target_min, target_max = self.scale
-            noise = (noise - current_min) / (current_max - current_min) * (target_max - target_min) + target_min
-        
-        return [noise]
-    
+                 ) -> torch.Tensor:
+        raise NotImplementedError("generate Not Implemented for Torch")
+
     def apply_noise(self, *args, **kwargs):
         raise NotImplementedError("Apply Noise Not Implemented for Torch")
-    
+
     def apply_constraints(self, *args, **kwargs):
         raise NotImplementedError("Apply Constrains Not Implemented for Torch")
 
 
-T = TypeVar('T', AdditiveNoiseGeneratorTF, AdditiveNoiseGeneratorTorch)
-
-
-class AdditiveNoiseGenerator(Generic[T], metaclass=NoiseGeneratorMeta):
-    def __init__(self, 
-                 framework: Literal["torch", "tf"], 
-                 use_constraints: bool,
-                 epsilon: float,
-                 scale: List[int] = None,
-                 dist: Literal["normal", "uniform"] = "normal") -> None:
+class AdditiveNoiseGenerator(NoiseGenerator, metaclass=NoiseGeneratorMeta):
+    def __init__(self,
+                 framework: Literal["torch", "tf"],
+                 scale: List[int] = (-1, 1),
+                 dist: Literal["normal", "uniform"] = "normal",
+                 bounds: List[List[int]] = None,
+                 bounds_type: Literal["relative", "absolute"] = "relative",
+                 custom_mask: Union[np.ndarray, tf.Tensor] = None,
+                 constraints: List[PostOptimizationConstraint] = None,
+                 *args,
+                 **kwargs
+                 ) -> None:
         self.framework: Literal["torch", "tf"] = framework
-        self.use_constraints: bool = use_constraints

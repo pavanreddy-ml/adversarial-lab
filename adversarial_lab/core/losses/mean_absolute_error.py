@@ -23,6 +23,7 @@ class MeanAbsoluteError(Loss):
                  targets: torch.Tensor
                  ) -> torch.Tensor:
         loss = F.l1_loss(predictions, targets)
+        self.set_value(loss)
         return loss
 
     def tf_op(self, 
@@ -31,4 +32,5 @@ class MeanAbsoluteError(Loss):
               ) -> tf.Tensor:
         mae = MAE_tf()
         loss = mae(targets, predictions)
+        self.set_value(loss)
         return loss

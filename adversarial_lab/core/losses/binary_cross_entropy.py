@@ -1,5 +1,6 @@
 from typing import Literal, List, Union
 from . import Loss
+from .penalty.penalty_base import Penalty
 
 import torch
 import tensorflow as tf
@@ -9,9 +10,10 @@ from tensorflow.keras.losses import binary_crossentropy
 
 class BinaryCrossEntropy(Loss):
     def __init__(self,
-                 framework: Literal["torch", "tf"]
+                 framework: Literal["torch", "tf"],
+                 penalties: List[Penalty] = []
                  ) -> None:
-        super().__init__(framework)
+        super().__init__(framework, penalties)
 
     def calculate(self, 
                   predictions: Union[torch.Tensor, tf.Tensor], 
@@ -23,6 +25,7 @@ class BinaryCrossEntropy(Loss):
                  targets: torch.Tensor
                  ) -> torch.Tensor:
         loss = F.binary_cross_entropy(predictions, targets)
+        self.set_value(loss)
         return loss
 
     def tf_op(self, 
@@ -30,4 +33,6 @@ class BinaryCrossEntropy(Loss):
               targets: tf.Tensor
               ) -> tf.Tensor:
         loss = binary_crossentropy(targets, predictions, from_logits = True)
-        return tf.reduce_mean(loss)
+        loss = tf.reduce_mean(loss)
+        self.set_value(loss)
+        return loss

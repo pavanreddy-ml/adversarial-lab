@@ -1,10 +1,10 @@
-from typing import Literal, Union, List
 from abc import ABC, abstractmethod, ABCMeta
-
+from typing import Literal
 import torch
 import tensorflow as tf
 
-class GetGradsMeta(ABCMeta):
+
+class PenaltyMeta(ABCMeta):
     def __new__(cls, name, bases, dct):
         if 'calculate' not in dct:
             raise TypeError(f"{name} class must implement a 'calculate' method.")
@@ -26,32 +26,23 @@ class GetGradsMeta(ABCMeta):
         return super().__new__(cls, name, bases, dct)
 
 
-class GetGradsBase(metaclass=GetGradsMeta):
-    def __init__(self, 
-                 model, 
-                 loss):
-        pass
-    
+class Penalty(metaclass=PenaltyMeta):
+    def __init__(self, framework: Literal["torch", "tf"]) -> None:
+        self.framework = framework
+        self.value = None
+
     @abstractmethod
-    def calculate(self, 
-                  model: Union[torch.nn.Module, tf.keras.Model], 
-                  inputs: Union[torch.Tensor, tf.Tensor], 
-                  targets: Union[torch.Tensor, tf.Tensor]):
+    def calculate(self, loss):
         pass
 
-    def torch_op(self, 
-                 model: torch.nn.Module, 
-                 inputs: torch.Tensor, 
-                 targets: torch.Tensor
-                 ) -> List[torch.Tensor]:
-        raise NotImplementedError()
-    
+    def torch_op(self, loss) -> torch.Tensor:
+        raise NotImplementedError("torch_op not implemented")
 
-    def tf_op(self, 
-              model: tf.keras.Model, 
-              inputs: tf.Tensor, 
-              targets: tf.Tensor
-              ) -> List[tf.Tensor]:
-        raise NotImplementedError()
+    def tf_op(self, loss) -> tf.Tensor:
+        raise NotImplementedError("tf_op not implemented")
     
-
+    def set_value(self, value):
+        if self.framework == "torch":
+            self.value = value.item()
+        elif self.framework == "tf":
+            self.value = float(value.numpy())

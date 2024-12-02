@@ -23,6 +23,7 @@ class MeanSquaredError(Loss):
                  targets: torch.Tensor
                  ) -> torch.Tensor:
         loss = F.mse_loss(predictions, targets)
+        self.set_value(loss)
         return loss
 
     def tf_op(self, 
@@ -31,4 +32,5 @@ class MeanSquaredError(Loss):
               ) -> tf.Tensor:
         mse = MSE_tf()
         loss = mse(targets, predictions)
+        self.set_value(loss)
         return loss
