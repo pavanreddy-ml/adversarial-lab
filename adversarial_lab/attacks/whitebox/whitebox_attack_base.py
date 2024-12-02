@@ -10,9 +10,10 @@ import tensorflow as tf
 from torch.nn import Module as TorchModel
 from tensorflow.keras.models import Model as TFModel
 
-from adversarial_lab.core.getgrad import GetGrads
-from adversarial_lab.core.modelinfo import ModelInfo
+
+from adversarial_lab.core import ALModel
 from adversarial_lab.core.tensor_ops import TensorOps
+from adversarial_lab.analytics import AdversarialAnalytics
 from adversarial_lab.core.losses import Loss, LossRegistry
 from adversarial_lab.core.optimizers import Optimizer, OptimizerRegistry
 from adversarial_lab.core.preprocessing import NoPreprocessing, Preprocessing
@@ -45,11 +46,12 @@ class WhiteBoxAttack(ABC):
         Additional keyword arguments.
     """
     def __init__(self, 
-                 model: Union[TorchModel, TFModel],
+                 model: ALModel,
                  loss: Union[str, Loss],
                  optimizer: Union[str, Optimizer],
                  noise_generator: NoiseGenerator = None,
                  preprocessing: Preprocessing = None,
+                 analytics: AdversarialAnalytics = None,
                  *args,
                  **kwargs
                  ) -> None:
@@ -57,17 +59,8 @@ class WhiteBoxAttack(ABC):
         Initializes the white-box attack, including setting the framework (PyTorch or TensorFlow),
         and setting up the model, loss function, optimizer, noise generator, and preprocessing.
         """
-        
-        if isinstance(model, torch.nn.Module):
-            self.framework = "torch"
-        elif isinstance(model, tf.keras.Model):
-            self.framework = "tf"
-        else:
-            raise ValueError("Unsupported model type. Must be a PyTorch or TensorFlow model.")
-        
-        get_model_info = ModelInfo(framework=self.framework)
-        self.model_info = get_model_info.get_info(model)
         self.model = model
+        self.framework: str = self.model.framework
 
         self._optimizer_arg = optimizer
         self._initialize_optimizer(self._optimizer_arg)
@@ -75,8 +68,14 @@ class WhiteBoxAttack(ABC):
         self._initialize_noise_generator(noise_generator)
         self._initialize_preprocessing(preprocessing)
 
+        if analytics is not None:
+            if not isinstance(analytics, AdversarialAnalytics):
+                raise ValueError("analytics must be an instance of AdversarialAnalytics")
+            self.analytics = analytics
+        else:
+            self.analytics = AdversarialAnalytics(db=None, trackers=[], table_name=None)
+
         self.tensor_ops = TensorOps(framework=self.framework)
-        self.get_grads = GetGrads(framework=self.framework, loss=self.loss)
         
     def attack(self,
                epochs: int,
@@ -170,7 +169,7 @@ class WhiteBoxAttack(ABC):
             If the noise generator is not an instance of `NoiseGenerator`.
         """
         if noise_generator is None:
-            self.noise_generator = AdditiveNoiseGenerator(framework=self.framework, use_constraints=True, epsilon=0.005, dist='uniform')
+            self.noise_generator = AdditiveNoiseGenerator(framework=self.framework, scale=(-0.05, 0.05), dist='uniform')
         elif isinstance(noise_generator, NoiseGenerator):
             self.noise_generator = noise_generator
         else:

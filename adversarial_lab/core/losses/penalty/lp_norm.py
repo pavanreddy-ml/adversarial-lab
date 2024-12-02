@@ -1,5 +1,5 @@
 from typing import Literal, List, Union
-from .. import Loss
+from .penalty_base import Penalty
 
 import torch
 import tensorflow as tf
@@ -7,7 +7,7 @@ from torch.nn import functional as F
 from tensorflow.keras.losses import categorical_crossentropy
 
 
-class LpNorm(Loss):
+class LpNorm(Penalty):
     def __init__(self,
                  framework: Literal["torch", "tf"],
                  p: int = 2,

@@ -3,6 +3,8 @@ from typing import Literal
 import torch
 import tensorflow as tf
 
+from .penalty.penalty_base import Penalty
+
 
 class LossMeta(ABCMeta):
     def __new__(cls, name, bases, dct):
@@ -27,8 +29,14 @@ class LossMeta(ABCMeta):
 
 
 class Loss(metaclass=LossMeta):
-    def __init__(self, framework: Literal["torch", "tf"]) -> None:
+    def __init__(self, framework: Literal["torch", "tf"], penalties) -> None:
         self.framework = framework
+        self.value = None
+
+        if not all(isinstance(penalty, Penalty) for penalty in penalties):
+            raise TypeError("penalties must be a list of Penalty instances")
+        
+        self.penalties = penalties
 
     @abstractmethod
     def calculate(self, output, target):
@@ -39,3 +47,9 @@ class Loss(metaclass=LossMeta):
 
     def tf_op(self, output: tf.Tensor, target: tf.Tensor) -> tf.Tensor:
         raise NotImplementedError("tf_op not implemented")
+    
+    def set_value(self, value):
+        if self.framework == "torch":
+            self.value = value.item()
+        elif self.framework == "tf":
+            self.value = float(value.numpy())
