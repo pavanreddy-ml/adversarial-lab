@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod, ABCMeta
 from typing import Literal
 import torch
 import tensorflow as tf
+import warnings
+import traceback
 
 
 class PenaltyMeta(ABCMeta):
@@ -27,22 +29,37 @@ class PenaltyMeta(ABCMeta):
 
 
 class Penalty(metaclass=PenaltyMeta):
-    def __init__(self, framework: Literal["torch", "tf"]) -> None:
+    def __init__(self, 
+                 framework: Literal["torch", "tf"],
+                 *args,
+                 **kwargs) -> None:
         self.framework = framework
+
         self.value = None
+        self.warned = False
 
     @abstractmethod
-    def calculate(self, loss):
+    def calculate(self, *args, **kwargs):
         pass
 
-    def torch_op(self, loss) -> torch.Tensor:
+    def torch_op(self, *args, **kwargs) -> torch.Tensor:
         raise NotImplementedError("torch_op not implemented")
 
-    def tf_op(self, loss) -> tf.Tensor:
+    def tf_op(self, *args, **kwargs) -> tf.Tensor:
         raise NotImplementedError("tf_op not implemented")
     
     def set_value(self, value):
-        if self.framework == "torch":
-            self.value = value.item()
-        elif self.framework == "tf":
-            self.value = float(value.numpy())
+        try:
+            if self.framework == "torch":
+                self.value = value.item()
+            elif self.framework == "tf":
+                self.value = float(value.numpy())
+        except Exception as e:
+            if not self.warned:
+                self.warned = True
+                warnings.warn(f"Error while setting value: {e}. Traceback: {traceback.format_exc()}")
+
+            self.value = None
+
+    def __repr__(self) -> str:
+        return self.__class__.__name__

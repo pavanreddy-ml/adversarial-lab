@@ -6,12 +6,14 @@ import tensorflow as tf
 from torch.nn import functional as F
 from tensorflow.keras.losses import MeanSquaredError as MSE_tf
 
+from . import Penalty
 
 class MeanSquaredError(Loss):
     def __init__(self,
-                 framework: Literal["torch", "tf"]
+                 framework: Literal["torch", "tf"],
+                 penalties: List[Penalty] = []
                  ) -> None:
-        super().__init__(framework)
+        super().__init__(framework, penalties)
 
     def calculate(self, 
                   predictions: Union[torch.Tensor, tf.Tensor], 

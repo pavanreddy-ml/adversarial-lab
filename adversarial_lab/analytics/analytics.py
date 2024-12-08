@@ -62,11 +62,11 @@ class AdversarialAnalytics:
         columns = {"epoch_num": "int"}
 
         for tracker in self.trackers:
-            tracker_columns = tracker.get_columns()
+            tracker_columns = list(tracker.serialize().keys())
             for tracker_column in tracker_columns:
                 if tracker_column in columns:
                     raise ValueError(f"Column '{tracker_column}' from '{tracker.__class__.__name__}' already from a previous tracker. Please ensure column names are unique.")
-                columns[tracker_column] = tracker_columns[tracker_column]
+                columns[tracker_column] = tracker.columns[tracker_column]
 
         self.db.create_table(self.table_name, columns, force=force_create_table)
 

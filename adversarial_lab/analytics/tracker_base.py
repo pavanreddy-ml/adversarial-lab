@@ -13,6 +13,8 @@ class Tracker(ABC):
         self.track_batch = track_batch
         self.track_epoch = track_epoch
 
+        self.reset_values()
+
     def pre_training(self,
                      *args,
                      **kwargs
@@ -38,9 +40,6 @@ class Tracker(ABC):
                       **kwargs
                       ) -> None:
         pass
-
-    def get_columns(self) -> Dict:
-        return self.columns
     
     @abstractmethod
     def serialize(self) -> Dict:

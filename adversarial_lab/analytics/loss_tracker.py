@@ -1,5 +1,7 @@
-from typing import Dict
+from typing import Dict, List
 from . import Tracker
+
+from adversarial_lab.core.losses import Loss, Penalty
 
 class LossTracker(Tracker):
     columns = {"epoch_losses": "json", 
@@ -15,45 +17,41 @@ class LossTracker(Tracker):
         self.track_loss = track_loss
         self.track_penalties = track_penalties
 
-        self.reset_values()
-
     def post_batch(self,
                    epoch_num: int,
+                   loss: Loss = None,
                    *args,
                    **kwargs
                    ) -> None:
         if not self.track_batch:
             return
-        
-        # loss = kwargs.get("loss", None)
 
-        # if loss is not None and self.track_loss:
-        #     self.epoch_losses_by_batch["loss"].append(loss.value)
+        if loss is not None and self.track_loss:
+            self.epoch_losses_by_batch[f"Loss {repr(loss)}"].append(loss.value)
 
-        # if loss is not None and self.track_penalties:
-        #     for i, penalty in enumerate(loss.penalties):
-        #         penalty_name = f"{i+1}_{penalty.name}"
-        #         if penalty_name not in self.epoch_losses_by_batch:
-        #             self.epoch_losses_by_batch[f"{i+1}_{penalty.name}"] = []
-        #         self.epoch_losses_by_batch[penalty_name] = penalty.value
+        if loss is not None and self.track_penalties:
+            for i, penalty in enumerate(loss.penalties):
+                penalty_name = f"Penalty {i+1}_{repr(penalty)}"
+                if penalty_name not in self.epoch_losses_by_batch:
+                    self.epoch_losses_by_batch[f"{i+1}_{repr(penalty)}"] = []
+                self.epoch_losses_by_batch[penalty_name] = penalty.value
         
     def post_epoch(self,
                    epoch_num: int,
+                   loss: Loss = None,
                    *args,
                    **kwargs
                    ) -> None:
         if not self.track_epoch:
             return
-        
-        # loss = kwargs.get("loss", None)
 
-        # if loss is not None and self.track_loss:
-        #     self.epoch_losses["loss"] = loss.value
+        if loss is not None and self.track_loss:
+            self.epoch_losses[f"Loss {repr(loss)}"] = loss.value
 
-        # if loss is not None and self.track_penalties:
-        #     for i, penalty in enumerate(loss.penalties):
-        #         penalty_name = f"{i+1}_{penalty.name}"
-        #         self.epoch_losses[penalty_name] = penalty.value
+        if loss is not None and self.track_penalties:
+            for i, penalty in enumerate(loss.penalties):
+                penalty_name = f"Penalty {i+1}_{repr(penalty)}"
+                self.epoch_losses[penalty_name] = penalty.value
 
     def serialize(self) -> Dict:
         data = {}
@@ -67,10 +65,5 @@ class LossTracker(Tracker):
         return data
     
     def reset_values(self) -> None:
-        self.epoch_losses = {
-            "loss": None,
-        }
-
-        self.epoch_losses_by_batch = {
-            "loss": [],
-        }
+        self.epoch_losses = {}
+        self.epoch_losses_by_batch: Dict[str, List] = {}

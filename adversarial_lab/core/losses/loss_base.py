@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod, ABCMeta
-from typing import Literal
+from typing import Literal, List
 import torch
 import tensorflow as tf
 
-from .penalty.penalty_base import Penalty
+import warnings
+import traceback
+
+from . import Penalty
 
 
 class LossMeta(ABCMeta):
@@ -29,9 +32,14 @@ class LossMeta(ABCMeta):
 
 
 class Loss(metaclass=LossMeta):
-    def __init__(self, framework: Literal["torch", "tf"], penalties) -> None:
+    def __init__(self, 
+                 framework: Literal["torch", "tf"], 
+                 penalties: List[Penalty]) -> None:
         self.framework = framework
         self.value = None
+        self.penalties = penalties
+
+        self.warned = False
 
         if not all(isinstance(penalty, Penalty) for penalty in penalties):
             raise TypeError("penalties must be a list of Penalty instances")
@@ -49,7 +57,17 @@ class Loss(metaclass=LossMeta):
         raise NotImplementedError("tf_op not implemented")
     
     def set_value(self, value):
-        if self.framework == "torch":
-            self.value = value.item()
-        elif self.framework == "tf":
-            self.value = float(value.numpy())
+        try:
+            if self.framework == "torch":
+                self.value = value.item()
+            elif self.framework == "tf":
+                self.value = float(value.numpy())
+        except Exception as e:
+            if not self.warned:
+                self.warned = True
+                warnings.warn(f"Error while setting value: {e}. Traceback: {traceback.format_exc()}")
+
+            self.value = None
+
+    def __repr__(self) -> str:
+        return self.__class__.__name__
