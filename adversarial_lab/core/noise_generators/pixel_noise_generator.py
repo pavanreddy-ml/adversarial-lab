@@ -12,24 +12,22 @@ from adversarial_lab.core.tensor_ops import TensorOps
 from adversarial_lab.core.constraints import PostOptimizationConstraint
 
 
-class PixelNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
+class PixelNoiseGeneratorTF(NoiseGenerator):
     def __init__(self,
                  framework: Literal["torch", "tf"],
                  scale: Tuple[int] = (-1, 1),
                  n_pixels: int = 1,
-                 pixel_selector: Literal["positive",
-                                         "negative", "absolute"] = "absolute",
+                 pixel_selector: Literal["positive", "negative", "absolute"] = "absolute",
                  direction: Literal["positive", "negative", "bi"] = "positive",
-                 gradient_application: Literal["individual",
-                                               "mean"] = "individual",
-                 strategy: Literal["single",
-                                   "iterative", "adaptive"] = "single",
-                 along_dims: List[Tuple[Tuple[bool], int, str]] = None,
+                 strategy: Literal["single", "iterative", "incremental"] = "single",
+                 reduce_dims: List[int] = None,
+                 epsilon: float = np.inf,
                  bounds: List[List[int]] = None,
                  bounds_type: Literal["relative", "absolute"] = "relative",
                  custom_mask: Union[np.ndarray, tf.Tensor] = None,
                  custom_pixels: List[Tuple[int]] = None,
-                 constraints: List[PostOptimizationConstraint] = None
+                 constraints: List[PostOptimizationConstraint] = None,
+                 *args, **kwargs
                  ) -> None:
         super().__init__(framework=framework,
                          bounds=bounds,
@@ -41,24 +39,24 @@ class PixelNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
         self.scale = scale
         self.pixel_selector = pixel_selector
         self.direction = direction
-        self.gradient_application = gradient_application
         self.strategy = strategy
-        self.along_dims = along_dims
         self.custom_pixels = custom_pixels
+        self.reduce_dims = reduce_dims
+        self.epsilon = [-epsilon, epsilon]
 
-        if self.n_pixels > len(self.custom_pixels):
+        self.increment_per_iteration = kwargs.get("increment_per_iteration", 1)
+
+        if self.custom_pixels is not None and self.n_pixels > len(self.custom_pixels): 
             raise ValueError(
                 "Number of pixels should be less than or equal to the number of custom pixels")
 
-        self.optimization_meta = {}
+        self._reset_optimization_meta()
 
     def generate_noise_meta(self,
                             sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
                             bounds: List[List[int]] = None
                             ) -> tf.Variable:
-        if not isinstance(sample, (np.ndarray, torch.Tensor, tf.Tensor)):
-            raise TypeError(
-                "Input must be of type np.ndarray, tf.Tensor")
+        super().generate_noise_meta(sample, bounds)
 
         shape = sample.shape
         if shape[0] is None or shape[0] == 1:
@@ -67,133 +65,126 @@ class PixelNoiseGeneratorTF(NoiseGenerator, metaclass=NoiseGeneratorMeta):
         noise = tf.zeros_like(sample)
         noise = tf.Variable(noise)
 
-        self._validate_along_dims(shape)
-
-        self._set_bounds(sample, bounds)
-        self._set_mask(bounds)
+        self._reset_optimization_meta()
 
         noise.assign(noise * self._mask)
         self.apply_constraints(noise)
 
-        return noise
+        return [noise]
 
     def get_noise(self,
-                  noise_meta: Union[tf.Tensor | tf.Variable]
+                  noise_meta: List[tf.Tensor | tf.Variable]
                   ) -> np.ndarray:
-        return noise_meta.numpy()
+        return tf.clip_by_value(noise_meta[0], self.scale[0], self.scale[1]).numpy()
 
     def apply_noise(self,
                     sample: tf.Tensor,
                     noise: tf.Variable
                     ) -> tf.Tensor:
-        # return sample + (noise * self._mask * (self.optimization_meta["pixel_mask"] if self.optimization_meta.get("pixel_mask") is not None else 1))
-        return sample + (noise * self._mask)
+        return tf.clip_by_value(sample + (noise[0] * self._mask), self.scale[0], self.scale[1])
     
     def apply_gradients(self,
                         tensor: tf.Variable,
                         gradients: tf.Tensor,
                         optimizer: Optimizer = None) -> None:
-        for i, ad in enumerate(self.along_dims):
-            # Get Gradient Mask
-            # Configure New Gradients.
-            self._optimize_noise(tensor, gradients, optimizer, ad)
-
-    def _optimize_noise(self,
-                        tensor: tf.Variable,
-                        gradients: tf.Tensor,
-                        optimizer: Optimizer,
-                        dim_info: Tuple[Tuple[bool], int, str]
-                        ) -> None:
         if self.strategy == "single":
-            self._optimize_single(tensor, gradients, optimizer, dim_info)
+            self._optimize_single(tensor[0], gradients)
         elif self.strategy == "iterative":
-            self._optimize_iterative(tensor, gradients, optimizer, dim_info)
-        elif self.strategy == "adaptive":
-            self._optimize_adaptive(tensor, gradients, optimizer, dim_info)
+            self._optimize_iterative(tensor, gradients, optimizer)
         elif self.strategy == "incremental":
-            self._optimize_incremental(tensor, gradients, optimizer, dim_info)
+            self._optimize_incremental(tensor[0], gradients)
         else:
             raise ValueError(f"Invalid Strategy: {self.strategy}")
 
     def _optimize_single(self,
-                         tensor: tf.Variable,
+                         tensor: List[tf.Variable],
                          gradients: tf.Tensor,
-                         optimizer: Optimizer,
-                         dim_info: Tuple[Tuple[bool], int, str]
                          ) -> None:
-        raise NotImplementedError("Single Optimization Not Implemented")
+        masked_gradients = self._get_masked_gradients(gradients, tensor[0])
+        attacked_pixels = self._get_attacked_pixels(masked_gradients, tensor[0])
+        tensor[0].assign(attacked_pixels)
+        self.end_optimization = True
 
     def _optimize_iterative(self,
                             tensor: tf.Variable,
                             gradients: tf.Tensor,
                             optimizer: Optimizer,
-                            dim_info: Tuple[Tuple[bool], int, str]
                             ) -> None:
-        raise NotImplementedError("Iterative Optimization Not Implemented")
 
-    def _optimize_adaptive(self,
-                           tensor: tf.Variable,
-                           gradients: tf.Tensor,
-                           optimizer: Optimizer,
-                           dim_info: Tuple[Tuple[bool], int, str]
-                           ) -> None:
-        raise NotImplementedError("Adaptive Optimization Not Implemented")
+        if self.optimization_meta["iterative_mask"] is None:
+            masked_gradients = self._get_masked_gradients(gradients, tensor[0])
+            self.optimization_meta["top_k_mask"] = tf.reshape(masked_gradients, tf.shape(tensor[0]))
+        masked_gradients = gradients * self.optimization_meta["top_k_mask"]
+        optimizer.apply(tensor, masked_gradients)
 
     def _optimize_incremental(self,
                               tensor: tf.Variable,
                               gradients: tf.Tensor,
-                              optimizer: Optimizer,
-                              dim_info: Tuple[Tuple[bool], int, str]
                               ) -> None:
-        raise NotImplementedError("Incremental Optimization Not Implemented")
+        masked_gradients = self._get_masked_gradients(gradients, tensor[0])
+        attacked_pixels = self._get_attacked_pixels(masked_gradients, tensor[0])
+        tensor.assign(tf.where(attacked_pixels != 0, attacked_pixels, tensor))
 
-    # def _optimize_noise(self,
-    #                     tensor: tf.Variable,
-    #                     gradients: tf.Tensor,
-    #                     optimizer: Optimizer,
-    #                     dim_info: Tuple[Tuple[bool], int, str]
-    #                     ) -> None:
-    #     along_dim, n_pixels, direction = dim_info
-    #     input_shape = tf.shape(gradients)
+    def _get_masked_gradients(self, 
+                        gradients: tf.Tensor,
+                        tensor: tf.Variable) -> tf.Tensor:
+        flat_gradients = tf.reshape(gradients, [-1])
 
-    #     reduction_axes = [i for i, flag in enumerate(along_dim) if not flag]
-    #     reduced_gradients = tf.reduce_sum(
-    #         gradients, axis=reduction_axes, keepdims=True)
-    #     flat_gradients = tf.reshape(reduced_gradients, [-1])
-
-    #     if direction == "positive":
-    #         flat_scores = flat_gradients
-    #     elif direction == "negative":
-    #         flat_scores = -flat_gradients
-    #     elif direction == "bi":
-    #         flat_scores = tf.abs(flat_gradients)
-    #     else:
-    #         raise ValueError(f"Invalid direction: {direction}")
-
-    #     top_k_values, top_k_indices = tf.math.top_k(flat_scores, k=n_pixels)
-
-    #     flat_mask = tf.scatter_nd(
-    #         tf.expand_dims(top_k_indices, axis=1),
-    #         tf.ones_like(top_k_values, dtype=tf.float32),
-    #         shape=tf.shape(flat_gradients)
-    #     )
-
-    #     mask_reduced = tf.reshape(flat_mask, tf.shape(reduced_gradients))
-    #     broadcast_mask = tf.broadcast_to(mask_reduced, input_shape)
-    #     masked_gradients = gradients * broadcast_mask
-    #     if optimizer:
-    #         optimizer.apply([(masked_gradients, tensor)])
-    #     else:
-    #         tensor.assign_add(masked_gradients)
-
-    def _validate_along_dims(self, shape):
-        if self.along_dims is None:
-            self.along_dims = [
-                ((True for i in range(len(shape))), self.n_pixels, self.direction)]
+        if self.pixel_selector == "positive":
+            flat_scores = flat_gradients
+        elif self.pixel_selector == "negative":
+            flat_scores = -flat_gradients
+        elif self.pixel_selector == "absolute":
+            flat_scores = tf.abs(flat_gradients)
         else:
-            for dim in self.along_dims:
-                if dim[1] >= len(shape):
-                    raise ValueError("Invalid Dimension")
+            raise ValueError(f"Invalid direction: {self.pixel_selector}")
+
+        _, top_k_indices = tf.math.top_k(flat_scores, k=self.increment_per_iteration)
+
+        top_k_mask = tf.scatter_nd(
+            indices=tf.expand_dims(top_k_indices, axis=1),
+            updates=tf.ones_like(top_k_indices, dtype=tf.float32),
+            shape=tf.shape(flat_gradients),
+        )
+
+        self.optimization_meta["top_k_mask"] = tf.reshape(top_k_mask, tf.shape(tensor))
+
+        masked_gradients = flat_gradients * top_k_mask
+
+        return masked_gradients
+    
+    def _get_attacked_pixels(self, masked_gradients: tf.Tensor, tensor: tf.Tensor) -> tf.Tensor:
+        if self.direction == "positive":
+            updated_gradients = tf.where(
+                tf.not_equal(masked_gradients, 0),
+                tf.fill(tf.shape(masked_gradients), tf.cast(self.epsilon[1], dtype=masked_gradients.dtype)),
+                masked_gradients
+            )
+        elif self.direction == "negative":
+            updated_gradients = tf.where(
+                tf.not_equal(masked_gradients, 0),
+                tf.fill(tf.shape(masked_gradients), tf.cast(self.epsilon[0], dtype=masked_gradients.dtype)),
+                masked_gradients
+            )
+        elif self.direction == "bi":
+            updated_gradients = tf.where(
+                masked_gradients > 0,
+                tf.fill(tf.shape(masked_gradients), tf.cast(self.epsilon[0], dtype=masked_gradients.dtype)),
+                tf.where(
+                    masked_gradients < 0,
+                    tf.fill(tf.shape(masked_gradients), tf.cast(self.epsilon[1], dtype=masked_gradients.dtype)),
+                    masked_gradients
+                )
+            )
+        else:
+            raise ValueError(f"Invalid direction: {self.direction}")
+        
+        return tf.reshape(updated_gradients, tf.shape(tensor))
+    
+    def _reset_optimization_meta(self):
+        self.optimization_meta = {
+            "iterative_mask": None,
+        }
 
 
 class PixelNoiseGeneratorTorch(NoiseGenerator):

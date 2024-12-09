@@ -89,6 +89,8 @@ class NoiseGenerator(ABC):
     def set_bounds(self, 
                    bounds: List[List[int]]
                    ) -> None:
+        if self._bounds is not None:
+            warnings.warn("Bounds are already set. Overwriting the existing bounds. This may lead to unexpected behavior.")
         self._bounds = bounds
     
     def _apply_bounds(self,
@@ -106,14 +108,13 @@ class NoiseGenerator(ABC):
             default_bounds = [0] * len(shape) + list(shape)
             self._bounds = [default_bounds]
 
-        self._validate_bounds(shape, self._bounds)
-        self._set_mask(sample, self._bounds)
+        self._validate_bounds(shape)
+        self._set_mask(sample)
 
     def _set_mask(self,
                   sample: Union[np.ndarray, tf.Tensor],
-                  bounds: List[List[int]] = None
                   ) -> None:
-        if bounds is None:
+        if self._bounds is None:
             mask = np.ones_like(sample.shape)
         else:
             shape = sample.shape
@@ -123,7 +124,7 @@ class NoiseGenerator(ABC):
             mask = np.zeros(shape, dtype=np.uint8)
             n_dims = len(shape)
 
-            for bound in bounds:
+            for bound in self._bounds:
                 slices = tuple(
                     slice(bound[i], bound[i] + bound[n_dims + i]) for i in range(n_dims))
                 mask[slices] = 1
@@ -148,13 +149,12 @@ class NoiseGenerator(ABC):
 
     def _validate_bounds(self,
                          sample_shape: List[int],
-                         bounds: List[Tuple[int]]
                          ) -> None:
-        if any(2*len(sample_shape) != len(bound) for bound in bounds):
+        if any(2*len(sample_shape) != len(bound) for bound in self._bounds):
             raise ValueError(
                 "Number of dimensions in bounds should be equal to the number of dimensions in the sample.")
         
-        for bound in bounds:
+        for bound in self._bounds:
             for i in range(len(sample_shape)):
                 if bound[i] > sample_shape[i]:
                     raise ValueError(f"Bound should be less than the corresponding dimension in the sample: Sample shape -> {sample_shape}, Bound -> {bound}")
