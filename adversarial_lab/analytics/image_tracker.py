@@ -22,7 +22,6 @@ class ImageTracker(Tracker):
     }
 
     def __init__(self,
-
                  track_raw_image: bool = True,
                  track_preprocessed_image: bool = True,
                  track_true_noise_raw_image: bool = True,

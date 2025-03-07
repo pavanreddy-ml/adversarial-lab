@@ -1,18 +1,14 @@
-from typing import Literal
 from abc import ABC, abstractmethod
+from typing import Literal
 
-from adversarial_lab.core.types import TensorVariableType
 from adversarial_lab.core.tensor_ops import TensorOps
 
-
-class PostOptimizationConstraint(ABC):
-    def __init__(self) -> None:
+class Masking(ABC):
+    def __init__(self, *args, **kwargs) -> None:
         pass
 
     @abstractmethod
-    def apply(self, 
-              noise: TensorVariableType, 
-              ) -> None:
+    def create(self, sample):
         pass
 
     def set_framework(self, 
@@ -22,3 +18,11 @@ class PostOptimizationConstraint(ABC):
             raise ValueError("framework must be either 'tf' or 'torch'")
         self.framework = framework
         self.tensor_ops = TensorOps(framework)
+
+    def _get_unbatched_sample(sample):
+        shape = sample.shape
+        if shape[0] == 1 or shape[0] is None:
+            return sample[0]
+        else:
+            return sample
+    

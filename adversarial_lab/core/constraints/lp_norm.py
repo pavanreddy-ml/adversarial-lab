@@ -1,37 +1,24 @@
 from typing import Literal
 from . import PostOptimizationConstraint
 
-import tensorflow as tf
-import torch
+from adversarial_lab.core.types import TensorVariableType
 
 
 class POLpNorm(PostOptimizationConstraint):
     def __init__(self, 
-                 framework: Literal['torch'] | Literal['tf'],
                  epsilon: float = -1.0,
                  l_norm: str = "2",
-                 max_iter: int = 100
+                 max_iter: int = 100,
                  ) -> None:
-        super().__init__(framework)
         self.epsilon = epsilon
         self.l_norm = l_norm
         self.max_iter = max_iter
-
+    
     def apply(self, 
-              noise: torch.Tensor | tf.Variable, 
-              ) -> torch.Tensor | tf.Tensor:
-        return super().apply(noise)
-    
-    def torch_op(self, 
-                 noise: torch.Tensor
-                 ) -> None:
-        raise NotImplementedError("LpNorm constraint is not implemented for PyTorch yet.")
-    
-    def tf_op(self, 
-              noise: tf.Variable
+              noise: TensorVariableType
               ) -> None:
         def compute_lp_norm(tensor, p):
-            return tf.reduce_sum(tf.abs(tensor) ** p) ** (1.0 / p)
+            return self.tensor_ops.reduce_sum(self.tensor_ops.abs(tensor) ** p) ** (1.0 / p)
 
         p = float(self.l_norm)
         low, high = 0.0, 1.0
@@ -46,7 +33,7 @@ class POLpNorm(PostOptimizationConstraint):
             else:
                 low = scale_factor
 
-            if tf.abs(norm - self.epsilon) < 1e-6:
+            if self.tensor_ops.abs(norm - self.epsilon) < 1e-6:
                 break
 
         noise.assign(noise * low)

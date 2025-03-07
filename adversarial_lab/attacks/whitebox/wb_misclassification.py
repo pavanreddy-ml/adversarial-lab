@@ -14,7 +14,7 @@ from adversarial_lab.core.optimizers import Optimizer
 from adversarial_lab.analytics import AdversarialAnalytics
 from adversarial_lab.core.preprocessing import Preprocessing
 from adversarial_lab.core.noise_generators import NoiseGenerator
-
+from adversarial_lab.core.constraints import PostOptimizationConstraint
 from . import WhiteBoxAttack
 from adversarial_lab.exceptions import VectorDimensionsError, IndifferentiabilityError
 
@@ -58,6 +58,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                  optimizer: str | Optimizer,
                  noise_generator: NoiseGenerator = None,
                  preprocessing: Preprocessing = None,
+                 constraints: PostOptimizationConstraint = None,
                  analytics: AdversarialAnalytics = None,
                  *args,
                  **kwargs) -> None:
@@ -66,6 +67,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                          optimizer=optimizer,
                          noise_generator=noise_generator,
                          preprocessing=preprocessing,
+                         constraints=constraints,
                          analytics=analytics,
                          *args,
                          **kwargs)
@@ -155,7 +157,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             target_vector[target_class] = 1
 
         if target_vector is not None:
-            target_vector = self.tensor_ops.to_tensor(target_vector)
+            target_vector = self.tensor_ops.tensor(target_vector)
             if len(target_vector) != self.model.model_info["output_shape"][1]:
                 raise VectorDimensionsError(
                     "target_vector must be the same size outputs.")
@@ -177,22 +179,22 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
         self.analytics.write(epoch_num=0)
 
         for epoch in range(epochs):
-            gradients, loss = self.model.calculate_gradients(
-                preprocessed_sample, noise_meta, self.noise_generator, target_vector, self.loss)
+            grads, logits_grad = self.model.calculate_gradients(
+                preprocessed_sample, noise_meta, self.noise_generator.apply_noise, target_vector, self.loss)
 
             self.noise_generator.apply_gradients(
-                noise_meta, gradients, self.optimizer)
-            self.noise_generator.apply_constraints(noise_meta)
+                noise_meta=noise_meta, grads=grads, logit_grads=logits_grad, optimizer=self.optimizer)
+            self._apply_constrains(noise_meta)
 
             # Stats
             predictions = self.model.predict(
                 self.noise_generator.apply_noise(preprocessed_sample, noise_meta))
             true_class = np.argmax(predictions, axis=1)[0]
-            true_class_confidence = predictions[0][true_class]
+            true_class_confidence = predictions[0][true_class].numpy()
             self.progress_bar.update(1)
             if verbose >= 2:
                 self.progress_bar.set_postfix(
-                    {'Loss': loss, 'Prediction': true_class, 'Prediction Confidence': true_class_confidence})
+                    {'Loss': self.loss.value, 'Prediction': true_class, 'Prediction Confidence': true_class_confidence})
 
             self.analytics.update_post_epoch_values(epoch_num=epoch,
                                                     loss=self.loss,
@@ -261,7 +263,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             target_vector[random_class] = 1
 
         target_vector = np.expand_dims(target_vector, axis=0)
-        target_vector = self.tensor_ops.to_tensor(target_vector)
+        target_vector = self.tensor_ops.tensor(target_vector)
 
         if predictions.shape != target_vector.shape:
             raise VectorDimensionsError(

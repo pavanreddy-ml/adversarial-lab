@@ -1,13 +1,11 @@
 from typing import Literal
 from . import PostOptimizationConstraint
 
-import tensorflow as tf
-import torch
-
+from adversarial_lab.core.types import TensorVariableType
 
 class POClip(PostOptimizationConstraint):
     def __init__(self, 
-                 framework: Literal['torch'] | Literal['tf'],
+                 framework: Literal["torch", "tf"],
                  min: float = -1.0,
                  max: float = 1.0
                  ) -> None:
@@ -16,17 +14,8 @@ class POClip(PostOptimizationConstraint):
         self.max = max
 
     def apply(self, 
-              noise: torch.Tensor | tf.Variable, 
-              ) -> torch.Tensor | tf.Tensor:
-        return super().apply(noise)
-    
-    def torch_op(self, 
-                 noise: torch.Tensor
-                 ) -> None:
-        pass
-    
-    def tf_op(self, 
-              noise: tf.Variable
+              noise: TensorVariableType, 
               ) -> None:
-        noise.assign(tf.clip_by_value(noise, self.min, self.max))
+        clipped_value = self.tensor_ops.clip(noise, self.min, self.max)
+        self.tensor_ops.assign(noise, clipped_value)
 

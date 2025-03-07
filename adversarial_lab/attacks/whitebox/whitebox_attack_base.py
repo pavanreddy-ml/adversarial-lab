@@ -1,15 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Union, Any, Dict
+from typing import Union, Any, Dict, List
 
 import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
-
-import torch
-import tensorflow as tf
-from torch.nn import Module as TorchModel
-from tensorflow.keras.models import Model as TFModel
-
 
 from adversarial_lab.core import ALModel
 from adversarial_lab.core.tensor_ops import TensorOps
@@ -18,6 +12,7 @@ from adversarial_lab.core.losses import Loss, LossRegistry
 from adversarial_lab.core.optimizers import Optimizer, OptimizerRegistry
 from adversarial_lab.core.preprocessing import NoPreprocessing, Preprocessing
 from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator, NoiseGenerator
+from adversarial_lab.core.constraints import PostOptimizationConstraint
 
 class WhiteBoxAttack(ABC):
     """
@@ -51,6 +46,7 @@ class WhiteBoxAttack(ABC):
                  optimizer: Union[str, Optimizer],
                  noise_generator: NoiseGenerator = None,
                  preprocessing: Preprocessing = None,
+                 constraints: List[PostOptimizationConstraint] = None,
                  analytics: AdversarialAnalytics = None,
                  *args,
                  **kwargs
@@ -59,7 +55,7 @@ class WhiteBoxAttack(ABC):
         Initializes the white-box attack, including setting the framework (PyTorch or TensorFlow),
         and setting up the model, loss function, optimizer, noise generator, and preprocessing.
         """
-        self.model = model
+        self.model = model if isinstance(model, ALModel) else ALModel(model)
         self.framework: str = self.model.framework
 
         self._optimizer_arg = optimizer
@@ -67,6 +63,7 @@ class WhiteBoxAttack(ABC):
         self._initialize_loss(loss)
         self._initialize_noise_generator(noise_generator)
         self._initialize_preprocessing(preprocessing)
+        self._initialize_constraints(constraints)
 
         if analytics is not None:
             if not isinstance(analytics, AdversarialAnalytics):
@@ -124,11 +121,13 @@ class WhiteBoxAttack(ABC):
 
         if isinstance(optimizer_copy, str):
             optimizer_class = OptimizerRegistry.get(optimizer_copy)
-            self.optimizer = optimizer_class(framework=self.framework)
+            self.optimizer = optimizer_class()
         elif isinstance(optimizer_copy, Optimizer):
             self.optimizer = optimizer_copy
         else:
             raise TypeError(f"Invalid type for optimizer: '{type(optimizer_copy)}'")
+        
+        self.optimizer.set_framework(self.framework)
 
     def _initialize_loss(self, loss):
         """
@@ -147,11 +146,13 @@ class WhiteBoxAttack(ABC):
         """
         if isinstance(loss, str):
             loss_class = LossRegistry.get(loss)
-            self.loss = loss_class(framework=self.framework)
+            self.loss = loss_class()
         elif isinstance(loss, Loss):
             self.loss = loss
         else:
             raise TypeError(f"Invalid type for loss: '{type(loss)}'")
+        
+        self.loss.set_framework(self.framework)
         
     def _initialize_noise_generator(self, noise_generator):
         """
@@ -169,11 +170,12 @@ class WhiteBoxAttack(ABC):
             If the noise generator is not an instance of `NoiseGenerator`.
         """
         if noise_generator is None:
-            self.noise_generator = AdditiveNoiseGenerator(framework=self.framework, scale=(-0.05, 0.05), dist='uniform')
+            self.noise_generator = AdditiveNoiseGenerator(scale=(-0.05, 0.05), dist='uniform')
         elif isinstance(noise_generator, NoiseGenerator):
             self.noise_generator = noise_generator
         else:
             raise TypeError(f"Invalid type for noise_generator: '{type(noise_generator)}'")
+        self.noise_generator.set_framework(self.framework)
         
     def _initialize_preprocessing(self, preprocessing):
         """
@@ -196,3 +198,35 @@ class WhiteBoxAttack(ABC):
             self.preprocessing = preprocessing
         else:
             raise TypeError(f"Invalid type for preprocessing: '{type(preprocessing)}'")
+        
+    def _initialize_constraints(self, 
+                                constraints: List[PostOptimizationConstraint]):
+        """
+        Initializes the constraints for the attack. If no constraints are provided, an empty list
+        is used by default.
+
+        Parameters:
+        ----------
+        constraints : PostOptimizationConstraint, optional
+            The constraints to apply to the adversarial noise after optimization.
+
+        Raises:
+        -------
+        TypeError
+            If the constraints argument is not an instance of `PostOptimizationConstraint`.
+        """
+        if constraints is None:
+            constraints = []
+
+        for contraint in constraints:
+            if not isinstance(contraint, PostOptimizationConstraint):
+                raise TypeError(f"Invalid type for constraints: '{type(contraint)}'")
+            
+        for constraint in constraints:
+            constraint.set_framework(self.framework)
+ 
+        self.constraints = constraints
+        
+    def _apply_constrains(self, noise):
+        for constraint in self.constraints:
+            constraint.apply(noise)

@@ -1,9 +1,12 @@
 from typing import overload, Type, Union
-from . import CategoricalCrossEntropy, Loss
+from . import CategoricalCrossEntropy, BinaryCrossEntropy, MeanAbsoluteError, MeanSquaredError, Loss
 
 class LossRegistry:
     __losses = {
-        "cce": CategoricalCrossEntropy
+        "cce": CategoricalCrossEntropy,
+        "bce": BinaryCrossEntropy,
+        "mae": MeanAbsoluteError,
+        "mse": MeanSquaredError
     }
 
     @classmethod

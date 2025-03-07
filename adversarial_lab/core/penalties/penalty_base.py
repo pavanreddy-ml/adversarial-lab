@@ -1,37 +1,24 @@
 from abc import ABC, abstractmethod
-from typing import Literal, List
+from typing import Literal
 
 import warnings
 import traceback
 
-from adversarial_lab.core.penalties import Penalty
-from adversarial_lab.core.tensor_ops import TensorOps
 from adversarial_lab.core.types import LossType, TensorType
+from adversarial_lab.core.tensor_ops import TensorOps
 
-
-
-class Loss():
+class Penalty(ABC):
     def __init__(self, 
-                 penalties: List[Penalty]
-                 ) -> None:
+                 *args,
+                 **kwargs) -> None:
         self.value = None
-        penalties = penalties if penalties is not None else []
-
         self.warned = False
-
-        if not all(isinstance(penalty, Penalty) for penalty in penalties):
-            raise TypeError("penalties must be a list of Penalty instances")
-        
-        self.penalties = penalties
 
     @abstractmethod
     def calculate(self, 
-                  target: TensorType, 
-                  predictions: TensorType, 
-                  logits: TensorType, 
+                  noise: TensorType,
                   *args, 
-                  **kwargs
-                  ) -> LossType:
+                  **kwargs):
         pass
     
     def set_value(self, 

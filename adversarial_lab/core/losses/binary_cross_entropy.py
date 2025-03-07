@@ -1,38 +1,26 @@
-from typing import Literal, List, Union
-from . import Loss
-from .penalty.penalty_base import Penalty
+from typing import List
 
-import torch
-import tensorflow as tf
-from torch.nn import functional as F
-from tensorflow.keras.losses import binary_crossentropy
+from . import Loss
+from adversarial_lab.core.penalties import Penalty
+from adversarial_lab.core.types import TensorType, LossType
 
 
 class BinaryCrossEntropy(Loss):
     def __init__(self,
-                 framework: Literal["torch", "tf"],
-                 penalties: List[Penalty] = []
+                 penalties: List[Penalty] = None,
+                 from_logits: bool = False
                  ) -> None:
-        super().__init__(framework, penalties)
+        super().__init__(penalties)
+        self.from_logits = from_logits
 
     def calculate(self, 
-                  predictions: Union[torch.Tensor, tf.Tensor], 
-                  targets: Union[torch.Tensor, tf.Tensor]):
-        return super().calculate(predictions, targets)
-
-    def torch_op(self, 
-                 predictions: torch.Tensor, 
-                 targets: torch.Tensor
-                 ) -> torch.Tensor:
-        loss = F.binary_cross_entropy(predictions, targets)
-        self.set_value(loss)
-        return loss
-
-    def tf_op(self, 
-              predictions: tf.Tensor, 
-              targets: tf.Tensor
-              ) -> tf.Tensor:
-        loss = binary_crossentropy(targets, predictions, from_logits = True)
-        loss = tf.reduce_mean(loss)
+                  target: TensorType,
+                  predictions: TensorType,
+                  logits: TensorType,
+                  ) -> LossType:
+        loss = self.tensor_ops.losses.binary_crossentropy(target=target, 
+                                                          predictions=predictions, 
+                                                          logits=logits, 
+                                                          from_logits=self.from_logits)
         self.set_value(loss)
         return loss

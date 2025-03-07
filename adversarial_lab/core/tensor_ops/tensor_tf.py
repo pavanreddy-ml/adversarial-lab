@@ -1,74 +1,196 @@
 import tensorflow as tf
-from typing import Optional, Dict, Any, Union
+import numpy as np
+
+from typing import Union, List, Any
+from adversarial_lab.core.types import TensorType, TensorVariableType, LossType, OptimizerType
+
 
 class TensorOpsTF:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args, **kwargs) -> None:
+        self.losses = TFLosses()
+        self.optimizers = TFOptimizers()
+
+    @staticmethod
+    def tensor(arr: Union[np.ndarray, List[float], List[int], TensorType]) -> TensorType:
+        """Convert numpy array or list to a TensorFlow tensor."""
+        return tf.convert_to_tensor(arr, dtype=tf.float32)
+
+    @staticmethod
+    def variable(arr: Union[np.ndarray, List[float], List[int], TensorType]) -> TensorVariableType:
+        """Convert numpy array or list to a TensorFlow variable."""
+        return tf.Variable(tf.convert_to_tensor(arr, dtype=tf.float32))
+
+    @staticmethod
+    def assign(tensor: TensorVariableType, value: Union[np.ndarray, List[float], List[int], TensorType]) -> None:
+        """Assign a new value to a TensorFlow variable."""
+        tensor.assign(tf.convert_to_tensor(value))
+
+    @staticmethod
+    def ones_like(tensor: TensorType) -> TensorType:
+        """Create a tensor of ones with the same shape as the input tensor."""
+        return tf.ones_like(tensor)
+
+    @staticmethod
+    def abs(tensor: TensorType) -> TensorType:
+        """Return absolute values of elements in the tensor."""
+        return tf.abs(tensor)
+
+    @staticmethod
+    def norm(tensor: TensorType, p: float) -> TensorType:
+        """Compute the Lp norm of the tensor."""
+        return tf.reduce_sum(tf.abs(tensor) ** p) ** (1.0 / p)
+
+    @staticmethod
+    def clip(tensor: TensorVariableType, min_val: float, max_val: float) -> None:
+        """Clip tensor values between min and max."""
+        return tf.clip_by_value(tensor, min_val, max_val)
+    
+    @staticmethod
+    def reduce_max(tensor: TensorType, axis: Any | None = None, keepdims: bool = False) -> TensorType:
+        """Compute the maximum value in the tensor."""
+        return tf.reduce_max(input_tensor=tensor, axis=axis, keepdims=keepdims)
+    
+    @staticmethod
+    def reduce_min(tensor: TensorType, axis: Any | None = None, keepdims: bool = False) -> TensorType:
+        """Compute the minimum value in the tensor."""
+        return tf.reduce_min(input_tensor=tensor, axis=axis, keepdims=keepdims)
+    
+    @staticmethod
+    def reduce_mean(tensor: TensorType, axis: Any | None = None, keepdims: bool = False) -> TensorType:
+        """Compute the mean value in the tensor."""
+        return tf.reduce_mean(input_tensor=tensor, axis=axis, keepdims=keepdims)
+    
+    @staticmethod
+    def reduce_sum(tensor: TensorType, axis: Any | None = None, keepdims: bool = False, name: Any | None = None) -> TensorType:
+        """Compute the sum of all elements in the tensor."""
+        return tf.reduce_sum(input_tensor=tensor, axis=axis, keepdims=keepdims, name=name)
+    
+    @staticmethod
+    def random_normal(shape: List[int]) -> TensorType:
+        """Generate a tensor with random normal values."""
+        return tf.random.normal(shape)
+    
+    @staticmethod
+    def random_uniform(shape: List[int], minval: float, maxval: float) -> TensorType:
+        """Generate a tensor with random uniform values."""
+        return tf.random.uniform(shape, minval=minval, maxval=maxval)
+    
+
+
+class TFLosses:
+    def __init__(self):
         pass
 
-    def tensor(self, 
-               shape: Union[tuple, list, tf.TensorShape], 
-               distribution: str = "fill", 
-               dist_params: Optional[Dict[str, Union[int, float]]] = None) -> tf.Tensor:
+    @staticmethod
+    def binary_crossentropy(target: TensorType,
+                            predictions: TensorType,
+                            logits: TensorType,
+                            from_logits: bool) -> TensorType:
+        """Compute binary cross-entropy loss."""
+        preds = logits if from_logits else predictions
+        loss = tf.keras.losses.binary_crossentropy(
+            target, preds, from_logits=from_logits)
+        loss = tf.reduce_mean(loss)
+        return loss
 
-        if distribution == "fill":
-            if dist_params is None:
-                fill_value = 0
-            else:
-                fill_value = dist_params['value']
-            return tf.fill(shape, fill_value)
+    @staticmethod
+    def categorical_crossentropy(target: TensorType,
+                                 predictions: TensorType,
+                                 logits: TensorType,
+                                 from_logits: bool) -> TensorType:
+        """Compute Categorical cross-entropy loss."""
+        preds = logits if from_logits else predictions
+        loss = tf.keras.losses.categorical_crossentropy(
+            target, preds, from_logits=from_logits)
+        loss = tf.reduce_mean(loss)
+        return loss
 
-        elif distribution == "uniform":
-            if dist_params is None:
-                min_val = 0.0
-                max_val = 1.0
-            else:
-                if 'min' not in dist_params or 'max' not in dist_params:
-                    raise ValueError("For 'uniform' distribution, 'min' and 'max' must be specified in dist_params")
-                min_val = dist_params['min']
-                max_val = dist_params['max']
-                if not isinstance(min_val, (int, float)) or not isinstance(max_val, (int, float)) or min_val >= max_val:
-                    raise ValueError("For 'uniform' distribution, 'min' must be less than 'max' and both must be numeric")
-            return tf.random.uniform(shape, minval=min_val, maxval=max_val)
+    @staticmethod
+    def mean_absolute_error(target: TensorType,
+                            predictions: TensorType
+                            ) -> TensorType:
+        """Compute Mean Absolute Error (MAE)."""
+        loss = tf.keras.losses.mean_absolute_error(target, predictions)
+        return tf.reduce_mean(loss)
 
-        elif distribution == "normal":
-            if dist_params is None:
-                mean = 0.0
-                stddev = 1.0
-            else:
-                if 'mean' not in dist_params or 'stddev' not in dist_params:
-                    raise ValueError("For 'normal' distribution, 'mean' and 'stddev' must be specified in dist_params")
-                mean = dist_params['mean']
-                stddev = dist_params['stddev']
-                if not isinstance(mean, (int, float)) or not isinstance(stddev, (int, float)) or stddev <= 0:
-                    raise ValueError("For 'normal' distribution, 'stddev' must be greater than 0 and both must be numeric")
-            return tf.random.normal(shape, mean=mean, stddev=stddev)
+    @staticmethod
+    def mean_squared_error(target: TensorType,
+                           predictions: TensorType
+                           ) -> TensorType:
+        """Compute Mean Absolute Error (MAE)."""
+        loss = tf.keras.losses.mean_squared_error(target, predictions)
+        return tf.reduce_mean(loss)
 
-        elif distribution == "linspace":
-            if dist_params is None:
-                start = 0.0
-                end = 1.0
-                num = shape[0] if len(shape) > 0 else 50
-            else:
-                if 'start' not in dist_params or 'end' not in dist_params or 'num' not in dist_params:
-                    raise ValueError("For 'linspace' distribution, 'start', 'end', and 'num' must be specified in dist_params")
-                start = dist_params['start']
-                end = dist_params['end']
-                num = dist_params['num']
-                if not isinstance(start, (int, float)) or not isinstance(end, (int, float)) or not isinstance(num, int) or num <= 0:
-                    raise ValueError("For 'linspace' distribution, 'start' and 'end' must be numeric, and 'num' must be a positive integer")
-            return tf.linspace(start, end, num)
 
-        else:
-            raise ValueError(f"Unsupported random distribution: {distribution}")
+class TFOptimizers:
+    def __init__(self, *args, **kwargs) -> None:
+        pass
 
-    def tensor_like(self, 
-                    array: Union[tf.Tensor, list, tuple], 
-                    distribution: str = "fill", 
-                    dist_params: Optional[Dict[str, Union[int, float]]] = None) -> tf.Tensor:
-        shape = tf.shape(array)
-        return self.tensor(shape, distribution, dist_params)
+    @staticmethod
+    def Adam(learning_rate: float = 0.001,
+             beta_1: float = 0.9,
+             beta_2: float = 0.999,
+             epsilon: float = 1e-8
+             ) -> OptimizerType:
+        """Create an Adam optimizer."""
+        return tf.keras.optimizers.Adam(
+            learning_rate=learning_rate,
+            beta_1=beta_1,
+            beta_2=beta_2,
+            epsilon=epsilon
+        )
+    
+    @staticmethod
+    def SGD(learning_rate: float = 0.01,
+            momentum: float = 0.0,
+            nesterov: bool = False,
+            weight_decay: float = None,
+            clipnorm: float = None,
+            clipvalue: float = None
+            ) -> OptimizerType:
+        return tf.keras.optimizers.SGD(
+            learning_rate=learning_rate,
+            momentum=momentum,
+            nesterov=nesterov,
+            weight_decay=weight_decay,
+            clipnorm=clipnorm,
+            clipvalue=clipvalue
+        )
+    
+    @staticmethod
+    def PGD(learning_rate: float = 0.001,
+            projection_fn: Any = None
+            ) -> OptimizerType:
+        class PGDOptimizer(tf.keras.optimizers.legacy.Optimizer):  # Ensure compatibility
+            def __init__(self, learning_rate=0.01, projection_fn=None, name="PGD", **kwargs):
+                super().__init__(name, **kwargs)
+                self._learning_rate = learning_rate
+                self.projection_fn = projection_fn
 
-    def to_tensor(self, 
-                  data: Any, 
-                  dtype: tf.DType = tf.float32) -> tf.Tensor:
-        return tf.convert_to_tensor(data, dtype=dtype)
+            def _resource_apply_dense(self, grad, var, apply_state=None):
+                var.assign_sub(self._learning_rate * grad)
+                if self.projection_fn:
+                    var.assign(self.projection_fn(var))
+
+            def _resource_apply_sparse(self, grad, var, indices, apply_state=None):
+                if isinstance(var, tf.IndexedSlices):
+                    var.scatter_sub(tf.IndexedSlices(grad * self._learning_rate, indices))
+                else:
+                    var.assign_sub(self._learning_rate * grad)
+                if self.projection_fn:
+                    var.assign(self.projection_fn(var))
+
+            def get_config(self):
+                config = super().get_config()
+                config.update({"learning_rate": self._learning_rate})
+                return config
+            
+        return PGDOptimizer(learning_rate=learning_rate, projection_fn=projection_fn)
+    
+    @staticmethod
+    def apply(optimizer: OptimizerType,
+              variable_tensor: List[TensorVariableType],
+              gradients: List[TensorType]) -> None:
+        """Apply gradients to update model weights."""
+        optimizer.apply_gradients(zip(gradients, variable_tensor))
+        

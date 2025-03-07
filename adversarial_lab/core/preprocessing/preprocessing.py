@@ -1,10 +1,10 @@
-from abc import ABC, ABCMeta, abstractmethod
-from typing import Literal, Union, TypeVar, Generic
+from abc import ABC, abstractmethod
+from adversarial_lab.core.types import TensorType
 
 class Preprocessing(ABC):
     def __init__(self) -> None:
         pass
 
     @abstractmethod
-    def preprocess(self, input):
+    def preprocess(self, sample: TensorType) -> TensorType:
         pass

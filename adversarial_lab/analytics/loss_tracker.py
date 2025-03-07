@@ -1,7 +1,8 @@
 from typing import Dict, List
 from . import Tracker
 
-from adversarial_lab.core.losses import Loss, Penalty
+from adversarial_lab.core.losses import Loss
+from adversarial_lab.core.penalties import Penalty
 
 class LossTracker(Tracker):
     columns = {"epoch_losses": "json", 
