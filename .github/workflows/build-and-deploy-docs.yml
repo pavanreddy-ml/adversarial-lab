@@ -30,7 +30,7 @@ jobs:
 
       - name: Build Documentation
         run: |
-          sphinx-build -b html docs/ docs/build/html/
+          sphinx-build -b html docs/source/ docs/build/html/
 
       - name: Ensure .nojekyll is Present
         run: |
