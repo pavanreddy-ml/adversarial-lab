@@ -5,6 +5,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   deploy:
     name: Deploy Documentation
@@ -21,10 +26,10 @@ jobs:
           git commit -m "Ensure .nojekyll is present" || echo "No changes to commit"
           git push origin main
 
-      - name: Deploy GitHub Pages
-        uses: actions/upload-pages-artifact@v2
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v4
         with:
           path: docs/build/html/
 
-      - name: Publish to GitHub Pages
+      - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v2
