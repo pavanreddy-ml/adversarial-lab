@@ -28,6 +28,13 @@ jobs:
         run: |
           pip install sphinx sphinx_rtd_theme
 
+      - name: Ensure `docs/` Folder Exists
+        run: |
+          if [ ! -d "docs" ]; then
+            mkdir -p docs/source docs/build/html
+            sphinx-quickstart docs --quiet --sep --project "Adversarial Lab" --author "Pavan Reddy" --release "0.0.1rc0
+          fi
+
       - name: Build Documentation
         run: |
           sphinx-build -b html docs/source/ docs/build/html/
