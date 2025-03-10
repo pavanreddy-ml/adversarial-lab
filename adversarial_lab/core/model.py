@@ -5,9 +5,13 @@ import importlib
 import numpy as np
 from typing import Dict, Any, List, Tuple, Callable, TYPE_CHECKING
 
+tf = None
+torch = None
+
 if TYPE_CHECKING:
     import tensorflow as tf
     import torch
+
 
 from adversarial_lab.core.types import TensorType, TensorVariableType, ModelType, LossType
 
@@ -17,6 +21,7 @@ from adversarial_lab.exceptions import IndifferentiabilityError
 
 class ALModelMeta(ABCMeta):
     def __call__(cls, model, *args, **kwargs):
+        global torch, tf
         if hasattr(model, "parameters") and callable(getattr(model, "parameters", None)):
             framework = "torch"
         elif hasattr(model, "layers") and hasattr(model, "count_params"):
@@ -25,13 +30,10 @@ class ALModelMeta(ABCMeta):
             raise ValueError(f"Unsupported model type: {type(model)}")
 
         if framework == "torch":
-            if "torch" not in sys.modules:
-                sys.modules["torch"] = importlib.import_module("torch")
+            torch = importlib.import_module("torch")
             specific_class = ALModelTorch
         elif framework == "tf":
-            if "tensorflow" not in sys.modules:
-                sys.modules["tensorflow"] = importlib.import_module("tensorflow")
-            sys.modules["tf"] = sys.modules["tensorflow"]  # Assign alias globally
+            tf = importlib.import_module("tensorflow")
             specific_class = ALModelTF
 
         return specific_class(model, *args, **kwargs)
@@ -43,6 +45,7 @@ class ALModelBase(ABC):
         self.model = deepcopy(model)
         self.model_info = self.get_info(self.model)
         self.framework = framework
+        self._compute_jacobian = False
 
     @abstractmethod
     def get_info(self, model) -> Dict[str, Any]:
@@ -65,6 +68,11 @@ class ALModelBase(ABC):
     @abstractmethod
     def forward(self, x: TensorType | np.ndarray) -> Any:
         pass
+
+    def set_compute_jacobian(self, 
+                             compute_jacobian: bool
+                             ) -> None:
+        self._compute_jacobian = compute_jacobian
 
 class ALModelTorch(ALModelBase):
     def __init__(self, 
@@ -214,7 +222,7 @@ class ALModelTF(ALModelBase):
           noise: List[TensorVariableType],
           apply_noise_fn: Callable,
           target_vector: TensorType,
-          loss: LossType
+          loss: Loss
     ) -> Tuple[TensorType, TensorType]:        
         with tf.GradientTape(persistent=True) as tape:
             for n in noise:
@@ -224,7 +232,7 @@ class ALModelTF(ALModelBase):
             preds = self.act(logits)
             loss_value = loss.calculate(target=target_vector, predictions=preds, logits=logits) if loss else None
 
-        logit_grads = tape.gradient(logits, noise)
+        logit_grads = tape.jacobian(logits, noise) if self._compute_jacobian else None
         grad_wrt_loss = tape.gradient(loss_value, noise) if loss_value is not None else None
         return grad_wrt_loss, logit_grads
 

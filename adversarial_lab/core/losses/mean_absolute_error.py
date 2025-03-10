@@ -6,8 +6,14 @@ from adversarial_lab.core.types import TensorType, LossType
 
 
 class MeanAbsoluteError(Loss):
+    """
+    Compute the mean absolute error loss.
+    """
+
     def __init__(self,
-                 penalties: List[Penalty] = []
+                 penalties: List[Penalty] = None,
+                 *args,
+                 **kwargs
                  ) -> None:
         super().__init__(penalties)
 

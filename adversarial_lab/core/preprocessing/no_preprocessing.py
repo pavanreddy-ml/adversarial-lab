@@ -6,4 +6,4 @@ class NoPreprocessing(Preprocessing):
         pass
 
     def preprocess(self, sample: TensorType) -> TensorType:
-        return input
+        return sample

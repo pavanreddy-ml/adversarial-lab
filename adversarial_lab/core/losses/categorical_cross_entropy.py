@@ -6,12 +6,14 @@ from adversarial_lab.core.types import TensorType, LossType
 
 
 class CategoricalCrossEntropy(Loss):
+    """
+    Compute the categorical cross-entropy loss.
+    """
     def __init__(self,
                  penalties: List[Penalty] = None,
                  from_logits: bool = False
                  ) -> None:
-        super().__init__(penalties)
-        self.from_logits = from_logits
+        super().__init__(penalties=penalties, from_logits=from_logits)
 
     def calculate(self,
                   target: TensorType,

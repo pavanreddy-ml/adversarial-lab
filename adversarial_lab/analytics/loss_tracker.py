@@ -5,7 +5,7 @@ from adversarial_lab.core.losses import Loss
 from adversarial_lab.core.penalties import Penalty
 
 class LossTracker(Tracker):
-    columns = {"epoch_losses": "json", 
+    _columns = {"epoch_losses": "json", 
                "epoch_losses_by_batch": "json"}
 
     def __init__(self,
@@ -19,11 +19,10 @@ class LossTracker(Tracker):
         self.track_penalties = track_penalties
 
     def post_batch(self,
-                   epoch_num: int,
-                   loss: Loss = None,
                    *args,
                    **kwargs
                    ) -> None:
+        loss = kwargs["loss"]
         if not self.track_batch:
             return
 
@@ -38,11 +37,11 @@ class LossTracker(Tracker):
                 self.epoch_losses_by_batch[penalty_name] = penalty.value
         
     def post_epoch(self,
-                   epoch_num: int,
-                   loss: Loss = None,
                    *args,
                    **kwargs
                    ) -> None:
+        loss = kwargs["loss"]
+
         if not self.track_epoch:
             return
 

@@ -12,10 +12,12 @@ class AdditiveNoiseGenerator(NoiseGenerator):
                  scale: List[int] = (-1, 1),
                  dist: Literal["normal", "uniform"] = "normal",
                  mask: TensorType | np.ndarray = None,
+                 requires_jacobian: bool = False,
                  *args,
                  **kwargs
                  ) -> None:
-        super().__init__(mask=mask)
+        super().__init__(mask=mask, 
+                         requires_jacobian=requires_jacobian)
 
         self.dist = dist
         self.scale = scale

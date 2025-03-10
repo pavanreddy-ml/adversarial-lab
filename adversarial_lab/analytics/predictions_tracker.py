@@ -5,7 +5,7 @@ import numpy as np
 
 
 class PredictionsTracker(Tracker):
-    columns = {
+    _columns = {
         "epoch_predictions": "json",
         "epoch_predictions_by_batch": "json"
     }
@@ -37,11 +37,11 @@ class PredictionsTracker(Tracker):
         self.round_to = round_to
 
     def post_batch(self,
-                   epoch_num: int,
-                   predictions: np.ndarray,
                    *args,
                    **kwargs
                    ) -> None:
+        predictions = kwargs["predictions"]
+
         if not self.track_batch:
             return
         
@@ -54,11 +54,11 @@ class PredictionsTracker(Tracker):
                 self.epoch_predictions_by_batch[i].append(round(float(value), self.round_to))
                 
     def post_epoch(self,
-                   epoch_num: int,
-                   predictions: np.ndarray,
                    *args,
                    **kwargs
                    ) -> None:
+        predictions = kwargs["predictions"]
+
         if not self.track_epoch:
             return  
         

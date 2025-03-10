@@ -8,8 +8,11 @@ from adversarial_lab.core.types import TensorType, TensorVariableType, Optimizer
 
 
 class NoiseGenerator(ABC):   
-    def __init__(self, mask: np.ndarray = None) -> None:
+    def __init__(self, 
+                 mask: np.ndarray = None,
+                 requires_jacobian: bool = False) -> None:
         self._mask = mask
+        self.requires_jacobian = requires_jacobian
     
     @abstractmethod
     def generate_noise_meta(self, 

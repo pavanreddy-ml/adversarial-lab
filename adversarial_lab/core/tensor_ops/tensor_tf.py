@@ -41,7 +41,7 @@ class TensorOpsTF:
         return tf.reduce_sum(tf.abs(tensor) ** p) ** (1.0 / p)
 
     @staticmethod
-    def clip(tensor: TensorVariableType, min_val: float, max_val: float) -> None:
+    def clip(tensor: TensorVariableType, min_val: float, max_val: float) -> TensorType:
         """Clip tensor values between min and max."""
         return tf.clip_by_value(tensor, min_val, max_val)
     
@@ -110,7 +110,8 @@ class TFLosses:
                             predictions: TensorType
                             ) -> TensorType:
         """Compute Mean Absolute Error (MAE)."""
-        loss = tf.keras.losses.mean_absolute_error(target, predictions)
+        loss_fn = tf.keras.losses.MeanAbsoluteError()
+        loss = loss_fn(target, predictions)
         return tf.reduce_mean(loss)
 
     @staticmethod
@@ -118,7 +119,8 @@ class TFLosses:
                            predictions: TensorType
                            ) -> TensorType:
         """Compute Mean Absolute Error (MAE)."""
-        loss = tf.keras.losses.mean_squared_error(target, predictions)
+        loss_fn = tf.keras.losses.MeanSquaredError()
+        loss = loss_fn(target, predictions)
         return tf.reduce_mean(loss)
 
 
@@ -145,46 +147,42 @@ class TFOptimizers:
             momentum: float = 0.0,
             nesterov: bool = False,
             weight_decay: float = None,
-            clipnorm: float = None,
-            clipvalue: float = None
             ) -> OptimizerType:
         return tf.keras.optimizers.SGD(
             learning_rate=learning_rate,
             momentum=momentum,
             nesterov=nesterov,
-            weight_decay=weight_decay,
-            clipnorm=clipnorm,
-            clipvalue=clipvalue
+            weight_decay=weight_decay
         )
     
     @staticmethod
-    def PGD(learning_rate: float = 0.001,
-            projection_fn: Any = None
-            ) -> OptimizerType:
-        class PGDOptimizer(tf.keras.optimizers.legacy.Optimizer):  # Ensure compatibility
+    def PGD(learning_rate: float = 0.001, projection_fn: Any = None) -> OptimizerType:
+        class PGDOptimizer(tf.keras.optimizers.Optimizer):
             def __init__(self, learning_rate=0.01, projection_fn=None, name="PGD", **kwargs):
-                super().__init__(name, **kwargs)
-                self._learning_rate = learning_rate
+                if not isinstance(learning_rate, (float, int)):
+                    raise ValueError(
+                        f"Argument `learning_rate` must be a float or LearningRateSchedule, received: {type(learning_rate)}"
+                    )
+
+                super().__init__(name=name, **kwargs)
+                self._learning_rate = self._build_learning_rate(learning_rate)
                 self.projection_fn = projection_fn
 
             def _resource_apply_dense(self, grad, var, apply_state=None):
-                var.assign_sub(self._learning_rate * grad)
+                var.assign_sub(self.lr * grad)
                 if self.projection_fn:
                     var.assign(self.projection_fn(var))
 
             def _resource_apply_sparse(self, grad, var, indices, apply_state=None):
-                if isinstance(var, tf.IndexedSlices):
-                    var.scatter_sub(tf.IndexedSlices(grad * self._learning_rate, indices))
-                else:
-                    var.assign_sub(self._learning_rate * grad)
+                var.assign_sub(self.lr * grad)
                 if self.projection_fn:
                     var.assign(self.projection_fn(var))
 
             def get_config(self):
                 config = super().get_config()
-                config.update({"learning_rate": self._learning_rate})
+                config.update({"learning_rate": float(self.lr.numpy())})
                 return config
-            
+
         return PGDOptimizer(learning_rate=learning_rate, projection_fn=projection_fn)
     
     @staticmethod

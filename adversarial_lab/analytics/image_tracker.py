@@ -10,7 +10,7 @@ import warnings
 
 
 class ImageTracker(Tracker):
-    columns = {
+    _columns = {
         "raw_image": "blob",
         "preprocessed_image": "blob",
         "true_noise_raw_image": "blob",
@@ -45,7 +45,6 @@ class ImageTracker(Tracker):
 
 
     def post_epoch(self,
-                   epoch_num: int,
                    *args,
                    **kwargs
                    ) -> None:

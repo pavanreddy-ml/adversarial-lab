@@ -1,11 +1,15 @@
-from typing import Literal
 from abc import ABC, abstractmethod
 
-from adversarial_lab.core.types import TensorVariableType
 from adversarial_lab.core.tensor_ops import TensorOps
+from adversarial_lab.core.types import TensorVariableType
+
+from typing import Literal
 
 
 class PostOptimizationConstraint(ABC):
+    """
+    Base class for post-optimization constraints.
+    """
     def __init__(self) -> None:
         pass
 
@@ -13,11 +17,26 @@ class PostOptimizationConstraint(ABC):
     def apply(self, 
               noise: TensorVariableType, 
               ) -> None:
+        """
+        Apply the constraint to the noise inplace.
+
+        Args:
+            noise: The noise to apply the constraint to.
+        """
         pass
 
     def set_framework(self, 
                       framework: Literal["tf", "torch"]
                       ) -> None:
+        """
+        Set the framework for the constraint.
+
+        Args:
+            framework: The framework to set, tf or torch.
+
+        Raises:
+            ValueError: If the framework is not 'tf' or 'torch'.
+        """
         if framework not in ["tf", "torch"]:
             raise ValueError("framework must be either 'tf' or 'torch'")
         self.framework = framework

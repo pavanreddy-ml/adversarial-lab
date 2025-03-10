@@ -1,65 +1,36 @@
-from typing import Dict, Union, Literal
-
 import random
 import numpy as np
 
-import torch
-import tensorflow as tf
-from torch.nn import Module as TorchModel
-from tensorflow.keras.models import Model as TFModel
-
+from . import WhiteBoxAttack
 from adversarial_lab.core import ALModel
 from adversarial_lab.core.losses import Loss
 from adversarial_lab.core.optimizers import Optimizer
 from adversarial_lab.analytics import AdversarialAnalytics
+from adversarial_lab.exceptions import VectorDimensionsError
 from adversarial_lab.core.preprocessing import Preprocessing
 from adversarial_lab.core.noise_generators import NoiseGenerator
 from adversarial_lab.core.constraints import PostOptimizationConstraint
-from . import WhiteBoxAttack
-from adversarial_lab.exceptions import VectorDimensionsError, IndifferentiabilityError
+
+from typing import Optional, Union, Literal
+from adversarial_lab.core.types import TensorType
 
 
 class WhiteBoxMisclassification(WhiteBoxAttack):
     """
-    WhiteBoxMisclassification is a subclass of `WhiteBoxAttack` that performs white-box adversarial 
-    attacks targeting misclassification. It supports both PyTorch and TensorFlow models.
-
-    Parameters
-    ----------
-    model : Union[TorchModel, TFModel]
-        The machine learning model to attack, either a PyTorch (`torch.nn.Module`) or TensorFlow (`tf.keras.Model`) model.
-    loss : Union[str, Loss]
-        The loss function to optimize the attack. It can either be a string that refers to a registered loss
-        or an instance of a `Loss` object.
-    optimizer : Union[str, Optimizer]
-        The optimizer to use for updating the noise during the attack. It can either be a string referring to 
-        a registered optimizer or an instance of `Optimizer`.
-    noise_generator : NoiseGenerator, optional
-        The noise generator used to create perturbations. If not provided, a default noise generator will be used.
-    preprocessing : Preprocessing, optional
-        The preprocessing pipeline to apply before generating adversarial noise. If not provided, no preprocessing will be applied.
-    *args : tuple
-        Additional positional arguments.
-    **kwargs : dict
-        Additional keyword arguments.
-
-    Methods
-    -------
-    attack(sample, target_class=None, target_vector=None, strategy='random', binary_threshold=0.5, epochs=10, *args, **kwargs)
-        Executes the white-box adversarial attack by generating noise and applying it to the input sample.
-
-    _get_target_vector(predictions, true_class, strategy)
-        Generates a target vector for the attack based on the specified strategy (spread, uniform, or random).
+    WhiteBoxMisclassification is a white-box attack that generates adversarial examples by applying perturbations to the input sample.
+    The attack aims to misclassify the input sample into a target class or target vector.
+    It supports various strategies for generating the target vector and can handle binary and multi-class classification models.
+    The attack uses a noise generator to create perturbations and an optimizer to update the noise during the attack process.
     """
 
     def __init__(self,
                  model: ALModel,
-                 loss: str | Loss,
-                 optimizer: str | Optimizer,
-                 noise_generator: NoiseGenerator = None,
-                 preprocessing: Preprocessing = None,
-                 constraints: PostOptimizationConstraint = None,
-                 analytics: AdversarialAnalytics = None,
+                 optimizer: Union[str, Optimizer],
+                 loss: Optional[Union[str, Loss]] = None,
+                 noise_generator: Optional[NoiseGenerator] = None,
+                 preprocessing: Optional[Preprocessing] = None,
+                 constraints: Optional[PostOptimizationConstraint] = None,
+                 analytics: Optional[AdversarialAnalytics] = None,
                  *args,
                  **kwargs) -> None:
         super().__init__(model=model,
@@ -73,58 +44,15 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                          **kwargs)
 
     def attack(self,
-               sample: Union[np.ndarray, torch.Tensor, tf.Tensor],
+               sample: Union[np.ndarray, TensorType],
                target_class: int = None,
-               target_vector: Union[np.ndarray,
-                                    torch.Tensor, tf.Tensor] = None,
+               target_vector: Union[np.ndarray, TensorType] = None,
                strategy: Literal['spread', 'uniform', 'random'] = "random",
                binary_threshold: float = 0.5,
                epochs=10,
                *args,
                **kwargs
                ) -> np.ndarray:
-        """
-        Executes the white-box misclassification attack by applying perturbations to the input sample.
-
-        Parameters
-        ----------
-        sample : Union[np.ndarray, torch.Tensor, tf.Tensor]
-            The input sample to be attacked. This can be a NumPy array, PyTorch tensor, or TensorFlow tensor.
-        target_class : int, optional
-            The target class to misclassify the sample into. If provided, `target_vector` should not be provided.
-        target_vector : Union[np.ndarray, torch.Tensor, tf.Tensor], optional
-            A target vector that specifies the probability distribution over all output classes. If provided, `target_class` should not be provided.
-        strategy : Literal['spread', 'uniform', 'random'], optional
-            The strategy used to generate the target vector. Options are:
-            - 'spread': The target is spread across all classes except the true class.
-            - 'uniform': The target is uniformly distributed across all classes.
-            - 'random': The target is set to a random class that is not the true class.
-            The default is 'random'.
-        binary_threshold : float, optional
-            The threshold for binary classification models. If the model outputs a scalar, the prediction is thresholded at this value.
-            The default is 0.5.
-        epochs : int, optional
-            The number of epochs (iterations) to run the attack for. The default is 10.
-        *args : tuple
-            Additional positional arguments.
-        **kwargs : dict
-            Additional keyword arguments, including:
-            - verbose (int): Level of verbosity (0: no output, 1: progress bar, 2 or more: detailed information).
-
-        Returns
-        -------
-        np.ndarray
-            The adversarial noise generated during the attack.
-
-        Raises
-        ------
-        ValueError
-            If both `target_class` and `target_vector` are provided.
-        VectorDimensionsError
-            If `target_vector` has the wrong dimensions or does not match the output shape of the model.
-        IndifferentiabilityError
-            If the gradients for the attack cannot be computed.
-        """
         verbose = kwargs.get("verbose", 1)
         super().attack(epochs, *args, **kwargs)
 
@@ -206,7 +134,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                                                     )
             self.analytics.write(epoch_num=epoch)
 
-        self.analytics.update_post_training_values(epoch_num=epoch,
+        self.analytics.update_post_attack_values(epoch_num=epoch,
                                                    loss=self.loss,
                                                    raw_image=sample,
                                                    preprocessed_image=preprocessed_sample.numpy(),
@@ -219,35 +147,10 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
         return noise_meta, self.noise_generator.get_noise(noise_meta)
 
     def _get_target_vector(self,
-                           predictions: Union[np.ndarray, torch.Tensor, tf.Tensor],
+                           predictions: Union[np.ndarray, TensorType],
                            true_class: int,
                            strategy: Literal['spread', 'uniform', 'random']
-                           ) -> Union[np.ndarray, torch.Tensor, tf.Tensor]:
-        """
-        Generates a target vector for the adversarial attack based on the given strategy.
-
-        Parameters
-        ----------
-        predictions : Union[np.ndarray, torch.Tensor, tf.Tensor]
-            The model's output predictions for the input sample.
-        true_class : int
-            The index of the true class for the input sample.
-        strategy : Literal['spread', 'uniform', 'random']
-            The strategy for generating the target vector. Options are:
-            - 'spread': The target is spread across all classes except the true class.
-            - 'uniform': The target is uniformly distributed across all classes.
-            - 'random': The target is set to a random class that is not the true class.
-
-        Returns
-        -------
-        Union[np.ndarray, torch.Tensor, tf.Tensor]
-            The generated target vector, in the same framework format as the input `predictions`.
-
-        Raises
-        ------
-        VectorDimensionsError
-            If the shape of the generated target vector does not match the shape of the model's predictions.
-        """
+                           ) -> Union[np.ndarray, TensorType]:
         num_classes = predictions.shape[1]
 
         if strategy == 'spread':

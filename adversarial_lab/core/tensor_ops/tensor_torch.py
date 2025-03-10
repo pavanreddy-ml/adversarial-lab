@@ -1,12 +1,80 @@
 import torch
 import torch.nn.functional as F
-from typing import List, Callable
+from typing import List, Callable, Any, Union
+import numpy as np
 
 from adversarial_lab.core.types import TensorType, TensorVariableType, LossType, OptimizerType
 
 class TensorOpsTorch:
     def __init__(self, *args, **kwargs) -> None:
         self.losses = TorchLosses()
+        self.optimizers = TorchOptimizers()
+
+    @staticmethod
+    def tensor(arr: Union[np.ndarray, List[float], List[int], torch.Tensor]) -> torch.Tensor:
+        """Convert numpy array or list to a PyTorch tensor."""
+        return torch.tensor(arr, dtype=torch.float32)
+
+    @staticmethod
+    def variable(arr: Union[np.ndarray, List[float], List[int], torch.Tensor]) -> torch.Tensor:
+        """Convert numpy array or list to a PyTorch tensor with gradients enabled."""
+        return torch.tensor(arr, dtype=torch.float32, requires_grad=True)
+
+    @staticmethod
+    def assign(tensor: torch.Tensor, value: Union[np.ndarray, List[float], List[int], torch.Tensor]) -> None:
+        """Assign a new value to a PyTorch tensor (in-place update)."""
+        with torch.no_grad():
+            tensor.copy_(torch.tensor(value, dtype=torch.float32))
+
+    @staticmethod
+    def ones_like(tensor: torch.Tensor) -> torch.Tensor:
+        """Create a tensor of ones with the same shape as the input tensor."""
+        return torch.ones_like(tensor)
+
+    @staticmethod
+    def abs(tensor: torch.Tensor) -> torch.Tensor:
+        """Return absolute values of elements in the tensor."""
+        return torch.abs(tensor)
+
+    @staticmethod
+    def norm(tensor: torch.Tensor, p: float) -> torch.Tensor:
+        """Compute the Lp norm of the tensor."""
+        return torch.norm(tensor, p=p)
+
+    @staticmethod
+    def clip(tensor: torch.Tensor, min_val: float, max_val: float) -> torch.Tensor:
+        """Clip tensor values between min and max."""
+        return torch.clamp(tensor, min=min_val, max=max_val)
+
+    @staticmethod
+    def reduce_max(tensor: torch.Tensor, axis: Any | None = None, keepdims: bool = False) -> torch.Tensor:
+        """Compute the maximum value in the tensor."""
+        return torch.max(tensor, dim=axis, keepdim=keepdims)[0] if axis is not None else torch.max(tensor)
+
+    @staticmethod
+    def reduce_min(tensor: torch.Tensor, axis: Any | None = None, keepdims: bool = False) -> torch.Tensor:
+        """Compute the minimum value in the tensor."""
+        return torch.min(tensor, dim=axis, keepdim=keepdims)[0] if axis is not None else torch.min(tensor)
+
+    @staticmethod
+    def reduce_mean(tensor: torch.Tensor, axis: Any | None = None, keepdims: bool = False) -> torch.Tensor:
+        """Compute the mean value in the tensor."""
+        return torch.mean(tensor, dim=axis, keepdim=keepdims) if axis is not None else torch.mean(tensor)
+
+    @staticmethod
+    def reduce_sum(tensor: torch.Tensor, axis: Any | None = None, keepdims: bool = False) -> torch.Tensor:
+        """Compute the sum of all elements in the tensor."""
+        return torch.sum(tensor, dim=axis, keepdim=keepdims) if axis is not None else torch.sum(tensor)
+
+    @staticmethod
+    def random_normal(shape: List[int]) -> torch.Tensor:
+        """Generate a tensor with random normal values."""
+        return torch.randn(shape)
+
+    @staticmethod
+    def random_uniform(shape: List[int], minval: float, maxval: float) -> torch.Tensor:
+        """Generate a tensor with random uniform values."""
+        return torch.empty(shape).uniform_(minval, maxval)
 
 
 class TorchLosses:
@@ -53,31 +121,38 @@ class TorchOptimizers:
         pass
 
     @staticmethod
-    def adam(learning_rate: float = 0.001,
-             beta1: float = 0.9,
-             beta2: float = 0.999,
+    def Adam(learning_rate: float = 0.001,
+             beta_1: float = 0.9,
+             beta_2: float = 0.999,
              epsilon: float = 1e-8
              ) -> OptimizerType:
         """Apply Adam optimizer."""
-        return torch.optim.Adam([], lr=learning_rate, betas=(beta1, beta2), eps=epsilon)
+        import torch.optim as optim
+        temp_param = torch.nn.Parameter(torch.tensor(0.0, requires_grad=True))
+        opt = optim.Adam([temp_param], lr=learning_rate, betas=(beta_1, beta_2), eps=epsilon)
+        opt.param_groups[0]["params"] = [] 
+        return opt
     
     @staticmethod
-    def sgd(learning_rate: float = 0.01,
+    def SGD(learning_rate: float = 0.01,
             momentum: float = 0.0,
+            nesterov: bool = False,
             weight_decay: float = 0.0,
-            nesterov: bool = False
             ) -> OptimizerType:
         """Apply SGD optimizer."""
-        return torch.optim.SGD(
-            [],
+        temp_param = torch.nn.Parameter(torch.tensor(0.0, requires_grad=True))
+        opt = torch.optim.SGD(
+            [temp_param],
             lr=learning_rate,
             momentum=momentum,
-            weight_decay=weight_decay,
+            weight_decay=weight_decay if weight_decay is not None else 0.0,
             nesterov=nesterov
         )
+        opt.param_groups[0]["params"] = [] 
+        return opt
 
     @staticmethod
-    def pgd(learning_rate: float = 0.01,
+    def PGD(learning_rate: float = 0.01,
             projection_fn: Callable[[TensorType], TensorType] = None
             ) -> OptimizerType:
         class PGDOptimizer(torch.optim.Optimizer):
@@ -99,7 +174,10 @@ class TorchOptimizers:
                 if closure is not None:
                     return closure()
 
-        return PGDOptimizer([], lr=learning_rate, projection_fn=projection_fn)
+        temp_param = torch.nn.Parameter(torch.tensor(0.0, requires_grad=True))
+        opt = PGDOptimizer([temp_param], lr=learning_rate, projection_fn=projection_fn)
+        opt.param_groups[0]["params"] = [] 
+        return opt
 
     @staticmethod
     def apply(optimizer: OptimizerType,

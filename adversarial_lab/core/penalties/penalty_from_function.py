@@ -25,8 +25,8 @@ class PenaltyFromFunction:
             def __init__(self, func: Callable):
                 self.function = func
 
-            def preprocess(self, input):
-                return self.function(input)
+            def calculate(self, noise, *args, **kwargs):
+                return self.function(noise)
 
         return CustomPenaltyFromFunction(function)
     

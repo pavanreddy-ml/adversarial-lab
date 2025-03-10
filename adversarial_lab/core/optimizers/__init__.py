@@ -8,6 +8,6 @@ __all__ = [
     "Optimizer",
     "OptimizerRegistry",
     "Adam",
-    "SGD"
+    "SGD",
     "PGD"
 ]
