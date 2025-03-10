@@ -30,7 +30,7 @@ jobs:
 
       - name: Generate API Documentation (if applicable)
         run: |
-          sphinx-apidoc -o docs/source adversarial_lab
+          sphinx-apidoc --force -o docs/source adversarial_lab
 
       - name: Build Documentation
         run: |

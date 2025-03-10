@@ -18,11 +18,22 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../adversarial_lab")))
 
+# Sphinx Extensions
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode'
 ]
+
+# Recursively include all submodules
+autosummary_generate = True
+autodoc_default_options = {
+    'members': True,
+    'undoc-members': True,
+    'private-members': True,
+    'special-members': '__init__',
+    'show-inheritance': True
+}
 
 html_theme = "sphinx_rtd_theme"
 

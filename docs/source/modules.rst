@@ -2,6 +2,6 @@ adversarial_lab
 ===============
 
 .. toctree::
-   :maxdepth: 6
+   :maxdepth: 100
 
    adversarial_lab
