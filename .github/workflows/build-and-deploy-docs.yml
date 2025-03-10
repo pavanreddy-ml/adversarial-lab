@@ -28,22 +28,18 @@ jobs:
         run: |
           pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
 
-      - name: Generate API Documentation (if applicable)
-        run: |
-          sphinx-apidoc --force -o docs/source adversarial_lab
-
       - name: Build Documentation
         run: |
-          sphinx-build -b html docs/source docs/build/html/
+          sphinx-build -b html docs/ docs/build/
 
       - name: Ensure .nojekyll is Present
         run: |
-          touch docs/build/html/.nojekyll
+          touch docs/build/.nojekyll
 
       - name: Upload GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/build/html/
+          path: docs/build/
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
