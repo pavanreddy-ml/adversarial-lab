@@ -1,30 +1,23 @@
-# Configuration file for Sphinx documentation
-
 import os
 import sys
 
-# -- Path Setup --------------------------------------------------------------
+# Ensure Sphinx finds the project root
+sys.path.insert(0, os.path.abspath("../adversarial_lab"))
 
-# Ensure Sphinx can find the project root
-sys.path.insert(0, os.path.abspath(".."))  # Adjust path to locate `adversarial_lab`
-
-# -- Project Information -----------------------------------------------------
+# Project info
 project = "Adversarial Lab"
 author = "Pavan Reddy"
-release = "0.0.1"
+release = "0.0.1rc0"
 
-# -- General Configuration ---------------------------------------------------
+# Sphinx extensions
 extensions = [
-    "sphinx.ext.autodoc",        # Parses docstrings
-    "sphinx.ext.autosummary",    # Generates summary tables
-    "sphinx.ext.napoleon",       # Supports Google-style docstrings
-    "sphinx.ext.viewcode",       # Links to source code
-    "sphinx.ext.todo"            # Allows TODOs in documentation
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
 ]
 
-autosummary_generate = True  # Auto-generate summary pages
-
-# Automatically document members, including private & special methods
+autosummary_generate = True
 autodoc_default_options = {
     "members": True,
     "undoc-members": True,
@@ -33,16 +26,22 @@ autodoc_default_options = {
     "show-inheritance": True
 }
 
+# Theme
+html_theme = "sphinx_rtd_theme"
+
+# Prevent warnings for missing _static/
+html_static_path = []
+
+rst_prolog = """
+.. toctree::
+   :maxdepth: 100
+"""
+
 # -- HTML Output -------------------------------------------------------------
 html_theme = "sphinx_rtd_theme"  # ReadTheDocs theme
-html_static_path = ["_static"]
 
-# -- Options for Autodoc & Napoleon ------------------------------------------
-napoleon_google_docstring = True  # Enable Google-style docstrings
-napoleon_numpy_docstring = False  # Disable NumPy-style docstrings
-
-# -- Suppress Warnings ------------------------------------------------------
-suppress_warnings = ["autodoc.import_object"]
+# Prevent warnings for missing _static/
+html_static_path = []
 
 # -- Exclude Build Directories -----------------------------------------------
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
