@@ -1,4 +1,4 @@
-name: Deploy Sphinx Docs
+name: Build and Deploy Sphinx Docs
 
 on:
   push:
@@ -11,20 +11,30 @@ permissions:
   id-token: write
 
 jobs:
-  deploy:
-    name: Deploy Documentation
+  build-and-deploy:
+    name: Build and Deploy Docs
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install Sphinx
+        run: |
+          pip install sphinx sphinx_rtd_theme
+
+      - name: Build Documentation
+        run: |
+          sphinx-build -b html docs/ docs/build/html/
+
       - name: Ensure .nojekyll is Present
         run: |
           touch docs/build/html/.nojekyll
-          git add docs/build/html/.nojekyll
-          git commit -m "Ensure .nojekyll is present" || echo "No changes to commit"
-          git push origin main
 
       - name: Upload GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3
