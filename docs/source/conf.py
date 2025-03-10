@@ -16,7 +16,7 @@ release = '0.0.1rc0'
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../adversarial_lab'))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../adversarial_lab")))
 
 extensions = [
     'sphinx.ext.autodoc',
