@@ -1,0 +1,30 @@
+name: Deploy Sphinx Docs
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Ensure .nojekyll is Present
+        run: |
+          touch docs/build/html/.nojekyll
+          git add docs/build/html/.nojekyll
+          git commit -m "Ensure .nojekyll is present" || echo "No changes to commit"
+          git push origin main
+
+      - name: Deploy GitHub Pages
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: docs/build/html/
+
+      - name: Publish to GitHub Pages
+        uses: actions/deploy-pages@v2
