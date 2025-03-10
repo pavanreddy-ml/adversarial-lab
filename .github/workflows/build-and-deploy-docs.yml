@@ -24,20 +24,17 @@ jobs:
         with:
           python-version: "3.9"
 
-      - name: Install Sphinx
+      - name: Install Dependencies
         run: |
-          pip install sphinx sphinx_rtd_theme
+          pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
 
-      - name: Ensure `docs/` Folder Exists and Initialize Sphinx
+      - name: Generate API Documentation (if applicable)
         run: |
-          if [ ! -d "docs" ]; then
-            mkdir -p docs
-            sphinx-quickstart docs --quiet --sep --project "Adversarial Lab" --author "Pavan Reddy" --release "0.0.1rc0"
-          fi
+          sphinx-apidoc -o docs/source adversarial_lab
 
       - name: Build Documentation
         run: |
-          sphinx-build -b html docs/source/ docs/build/html/
+          sphinx-build -b html docs/ docs/build/html/
 
       - name: Ensure .nojekyll is Present
         run: |
