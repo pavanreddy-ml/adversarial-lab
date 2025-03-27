@@ -7,47 +7,47 @@ from adversarial_lab.core.optimizers import Optimizer
 from adversarial_lab.core.types import TensorType, TensorVariableType, OptimizerType
 
 
-class NoiseGenerator(ABC):   
-    def __init__(self, 
+class NoiseGenerator(ABC):
+    def __init__(self,
                  mask: np.ndarray = None,
                  requires_jacobian: bool = False) -> None:
         self._mask = mask
         self.requires_jacobian = requires_jacobian
-    
+
     @abstractmethod
-    def generate_noise_meta(self, 
-                            sample: TensorType | np.ndarray, 
-                            *args, 
+    def generate_noise_meta(self,
+                            sample: TensorType | np.ndarray,
+                            *args,
                             **kwargs
                             ) -> List[TensorVariableType]:
         pass
 
     @abstractmethod
-    def get_noise(self, 
+    def get_noise(self,
                   noise_meta: Union[TensorVariableType]
                   ) -> np.ndarray:
         pass
 
     @abstractmethod
-    def apply_noise(self, 
-                    sample: TensorType,
-                    noise_meta: Union[TensorVariableType], 
-                    *args, 
-                    **kwargs
-                    ) -> Union[TensorVariableType, TensorType]:
+    def construct_perturbation(self,
+                               noise_meta: Union[TensorVariableType],
+                               *args,
+                               **kwargs
+                               ) -> Union[TensorVariableType, TensorType]:
         pass
 
-    def apply_gradients(self, 
-                        noise_meta: TensorVariableType, 
-                        grads: TensorType, 
-                        logit_grads: TensorType, 
-                        optimizer: OptimizerType | Optimizer) -> None:
+    def apply_gradients(self,
+                        noise_meta: TensorVariableType,
+                        optimizer: OptimizerType | Optimizer,
+                        grads: TensorType,
+                        jacobian: TensorType = None,
+                        ) -> None:
         optimizer.apply(weights=noise_meta, gradients=grads)
 
     def get_mask(self) -> np.ndarray:
-        return self._mask
+        return self._mask.numpy() if self._mask is not None else None
 
-    def set_framework(self, 
+    def set_framework(self,
                       framework: Literal["tf", "torch"]
                       ) -> None:
         if framework not in ["tf", "torch"]:

@@ -14,6 +14,11 @@ class TensorOpsTF:
     def tensor(arr: Union[np.ndarray, List[float], List[int], TensorType]) -> TensorType:
         """Convert numpy array or list to a TensorFlow tensor."""
         return tf.convert_to_tensor(arr, dtype=tf.float32)
+    
+    @staticmethod
+    def constant(value: Union[float, int], dtype: Any) -> TensorType:
+        """Create a TensorFlow constant."""
+        return tf.constant(value, dtype=dtype)
 
     @staticmethod
     def variable(arr: Union[np.ndarray, List[float], List[int], TensorType]) -> TensorVariableType:
@@ -24,6 +29,40 @@ class TensorOpsTF:
     def assign(tensor: TensorVariableType, value: Union[np.ndarray, List[float], List[int], TensorType]) -> None:
         """Assign a new value to a TensorFlow variable."""
         tensor.assign(tf.convert_to_tensor(value))
+
+    @staticmethod
+    def cast(tensor: TensorType, dtype: Any) -> TensorType:
+        """Cast tensor to a specified data type."""
+        return tf.cast(tensor, dtype)
+    
+    @staticmethod
+    def has_batch_dim(tensor: TensorType, axis: int = 0) -> bool:
+        """Check if the tensor has a batch dimension at the specified axis."""
+        return tensor.shape.rank is not None and tensor.shape.rank > axis and tensor.shape[axis] == 1
+    
+    @staticmethod
+    def add_batch_dim(tensor: TensorType, axis: int = 0) -> TensorType:
+        """Add a batch dimension to the tensor if it doesn't already exist."""
+        if tensor.shape.rank is not None and tensor.shape.rank > axis and tensor.shape[axis] == 1:
+            return tensor
+        return tf.expand_dims(tensor, axis=axis)
+    
+    @staticmethod
+    def is_zero(tensor: TensorType) -> bool:
+        """Check if all elements in the tensor are zero."""
+        return tf.reduce_all(tensor == 0)
+    
+    @staticmethod
+    def remove_batch_dim(tensor: TensorType, axis: int = 0) -> TensorType:
+        """Remove a batch dimension from the tensor if it exists."""
+        if tensor.shape.rank is not None and tensor.shape.rank > axis and tensor.shape[axis] == 1:
+            return tf.squeeze(tensor, axis=axis)
+        return tensor
+
+    @staticmethod
+    def zeros_like(tensor: TensorType, dtype: Any) -> TensorType:
+        """Create a tensor of ones with the same shape as the input tensor."""
+        return tf.zeros_like(tensor, dtype=dtype)
 
     @staticmethod
     def ones_like(tensor: TensorType) -> TensorType:
@@ -71,9 +110,19 @@ class TensorOpsTF:
         return tf.random.normal(shape)
     
     @staticmethod
+    def reduce_all(tensor: TensorType) -> bool:
+        """Check if all elements in the tensor are True."""
+        return tf.reduce_all(tensor)
+    
+    @staticmethod
     def random_uniform(shape: List[int], minval: float, maxval: float) -> TensorType:
         """Generate a tensor with random uniform values."""
         return tf.random.uniform(shape, minval=minval, maxval=maxval)
+    
+    @staticmethod
+    def relu(tensor: TensorType) -> TensorType:
+        """Compute the ReLU activation function."""
+        return tf.nn.relu(tensor)
     
 
 
@@ -159,28 +208,18 @@ class TFOptimizers:
     def PGD(learning_rate: float = 0.001, projection_fn: Any = None) -> OptimizerType:
         class PGDOptimizer(tf.keras.optimizers.Optimizer):
             def __init__(self, learning_rate=0.01, projection_fn=None, name="PGD", **kwargs):
-                if not isinstance(learning_rate, (float, int)):
-                    raise ValueError(
-                        f"Argument `learning_rate` must be a float or LearningRateSchedule, received: {type(learning_rate)}"
-                    )
-
                 super().__init__(name=name, **kwargs)
                 self._learning_rate = self._build_learning_rate(learning_rate)
                 self.projection_fn = projection_fn
 
-            def _resource_apply_dense(self, grad, var, apply_state=None):
-                var.assign_sub(self.lr * grad)
+            def update_step(self, gradient, variable):
+                variable.assign_sub(self._learning_rate * tf.sign(gradient))
                 if self.projection_fn:
-                    var.assign(self.projection_fn(var))
-
-            def _resource_apply_sparse(self, grad, var, indices, apply_state=None):
-                var.assign_sub(self.lr * grad)
-                if self.projection_fn:
-                    var.assign(self.projection_fn(var))
+                    variable.assign(self.projection_fn(variable))
 
             def get_config(self):
                 config = super().get_config()
-                config.update({"learning_rate": float(self.lr.numpy())})
+                config.update({"learning_rate": float(tf.keras.backend.get_value(self._learning_rate))})
                 return config
 
         return PGDOptimizer(learning_rate=learning_rate, projection_fn=projection_fn)

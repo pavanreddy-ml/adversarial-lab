@@ -14,6 +14,11 @@ class TensorOpsTorch:
     def tensor(arr: Union[np.ndarray, List[float], List[int], torch.Tensor]) -> torch.Tensor:
         """Convert numpy array or list to a PyTorch tensor."""
         return torch.tensor(arr, dtype=torch.float32)
+    
+    @staticmethod
+    def constant(value: Union[float, int], dtype: Any) -> torch.Tensor:
+        """Create a PyTorch constant."""
+        return torch.tensor(value, dtype=dtype)
 
     @staticmethod
     def variable(arr: Union[np.ndarray, List[float], List[int], torch.Tensor]) -> torch.Tensor:
@@ -25,6 +30,38 @@ class TensorOpsTorch:
         """Assign a new value to a PyTorch tensor (in-place update)."""
         with torch.no_grad():
             tensor.copy_(torch.tensor(value, dtype=torch.float32))
+
+    @staticmethod
+    def cast(tensor: torch.Tensor, dtype: Any) -> torch.Tensor:
+        """Cast tensor to a specified data type."""
+        return tensor.to(dtype)
+    
+    @staticmethod
+    def has_batch_dim(tensor: torch.Tensor, axis: int = 0) -> bool:
+        if tensor.dim() > axis and tensor.size(axis) == 1:
+            return True
+    
+    @staticmethod
+    def add_batch_dim(tensor: torch.Tensor, axis: int = 0) -> torch.Tensor:
+        if tensor.dim() > axis and tensor.size(axis) == 1:
+            return tensor
+        return tensor.unsqueeze(dim=axis)
+
+    @staticmethod
+    def remove_batch_dim(tensor: torch.Tensor, axis: int = 0) -> torch.Tensor:
+        if tensor.dim() > axis and tensor.size(axis) == 1:
+            return tensor.squeeze(dim=axis)
+        return tensor
+    
+    @staticmethod
+    def is_zero(tensor: torch.Tensor) -> bool:
+        """Check if all elements in the tensor are zero."""
+        return torch.all(tensor == 0)
+
+    @staticmethod
+    def zeros_like(tensor: torch.Tensor) -> torch.Tensor:
+        """Create a tensor of ones with the same shape as the input tensor."""
+        return torch.zeros_like(tensor)
 
     @staticmethod
     def ones_like(tensor: torch.Tensor) -> torch.Tensor:
@@ -65,6 +102,11 @@ class TensorOpsTorch:
     def reduce_sum(tensor: torch.Tensor, axis: Any | None = None, keepdims: bool = False) -> torch.Tensor:
         """Compute the sum of all elements in the tensor."""
         return torch.sum(tensor, dim=axis, keepdim=keepdims) if axis is not None else torch.sum(tensor)
+    
+    @staticmethod
+    def reduce_all(tensor: torch.Tensor) -> bool:
+        """Compute the logical AND of all elements in the tensor."""
+        return torch.all(tensor)
 
     @staticmethod
     def random_normal(shape: List[int]) -> torch.Tensor:
@@ -75,6 +117,11 @@ class TensorOpsTorch:
     def random_uniform(shape: List[int], minval: float, maxval: float) -> torch.Tensor:
         """Generate a tensor with random uniform values."""
         return torch.empty(shape).uniform_(minval, maxval)
+    
+    @staticmethod
+    def relu(tensor: torch.Tensor) -> torch.Tensor:
+        """Compute the ReLU activation function."""
+        return F.relu(tensor)
 
 
 class TorchLosses:

@@ -12,6 +12,7 @@ class MeanAbsoluteError(Loss):
 
     def __init__(self,
                  penalties: List[Penalty] = None,
+                 from_logits: bool = False,
                  *args,
                  **kwargs
                  ) -> None:
@@ -21,9 +22,10 @@ class MeanAbsoluteError(Loss):
                   target: TensorType,
                   predictions: TensorType,
                   logits: TensorType,
-                  from_logits: bool = False
+                  noise: TensorType,
                   ) -> LossType:
         loss = self.tensor_ops.losses.mean_absolute_error(target=target,
                                                           predictions=predictions)
+        self._apply_penalties(loss, noise)
         self.set_value(loss)
         return loss

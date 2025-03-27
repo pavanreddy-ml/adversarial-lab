@@ -18,9 +18,9 @@ class Tracker(ABC):
             track_epoch (bool, optional): If True, the tracker will track data after each epoch. Defaults to True.
         """
 
-        if not hasattr(self, 'columns') or not isinstance(self._columns, dict):
+        if not hasattr(self, '_columns') or not isinstance(self._columns, dict):
             raise AttributeError(
-                "The 'columns' attribute must be defined as a dictionary in the subclass.")
+                "The '_columns' attribute must be defined as a dictionary in the subclass.")
 
         self.track_batch = track_batch
         self.track_epoch = track_epoch

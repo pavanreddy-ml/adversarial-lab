@@ -5,6 +5,7 @@ from adversarial_lab.analytics import Tracker
 
 from typing import List, Optional
 
+
 class AdversarialAnalytics:
     def __init__(self,
                  db: Optional[DB] = None,
@@ -12,19 +13,30 @@ class AdversarialAnalytics:
                  table_name: Optional[str] = None,
                  force_create_table: bool = False) -> None:
         """
-        Tracks various metrics during the attack process. Initializes the database connection, 
-        trackers, and creates a table with the necessary columns. If `db` is None, the class will not track any metrics.
+        Tracks various metrics during the attack process.
 
-        Args:
-            db (DB, optional): The database object to use for storing the tracked data.
-            trackers (List[Tracker], optional): A list of Tracker objects to track various metrics.
-            table_name (str, optional): The name of the table to store the tracked data.
-            force_create_table (bool, optional): If True, the table will be deleted and re-created.
+        Initializes the database connection, trackers, and creates a table with the necessary columns.
+        If ``db`` is ``None``, the class will not track any metrics.
 
-        Raises:
-            ConnectionError: If unable to connect to the database.
-            TypeError: If the trackers are not of type 'Tracker'.
-            ValueError: If the table name is not provided.
+        Parameters
+        ----------
+        db : DB, optional
+            The database object to use for storing the tracked data.
+        trackers : list of Tracker, optional
+            A list of Tracker objects to track various metrics.
+        table_name : str, optional
+            The name of the table to store the tracked data.
+        force_create_table : bool, optional
+            If True, the table will be deleted and re-created.
+
+        Raises
+        ------
+        ConnectionError
+            If unable to connect to the database.
+        TypeError
+            If the trackers are not of type ``Tracker``.
+        ValueError
+            If the table name is not provided.
         """
 
         if db is None:
@@ -54,8 +66,8 @@ class AdversarialAnalytics:
             tracker.reset_values()
 
     def update_pre_attack_values(self,
-                                   *args,
-                                   **kwargs) -> None:
+                                 *args,
+                                 **kwargs) -> None:
         """
         Updates the values of all trackers before staring attack. Tracks data befor the attack process begins.
         """
@@ -82,8 +94,8 @@ class AdversarialAnalytics:
             tracker.post_epoch(*args, **kwargs)
 
     def update_post_attack_values(self,
-                                    *args,
-                                    **kwargs) -> None:
+                                  *args,
+                                  **kwargs) -> None:
         """
         Updates the values of all trackers after the attack. Called after the attack process ends."""
         for tracker in self.trackers:
@@ -107,18 +119,18 @@ class AdversarialAnalytics:
                 if tracker_column in columns:
                     raise ValueError(
                         f"Column '{tracker_column}' from '{tracker.__class__.__name__}' already from a previous tracker. Please ensure column names are unique.")
-                columns[tracker_column] = tracker.columns[tracker_column]
+                columns[tracker_column] = tracker._columns[tracker_column]
 
-        self.db.create_table(table_name=self.table_name, 
+        self.db.create_table(table_name=self.table_name,
                              schema=columns,
                              force=force_create_table)
 
-    def write(self, 
+    def write(self,
               epoch_num: int
               ) -> None:
         """
         Writes the tracked data to the database for an epoch.
-        
+
         Args:
             epoch_num (int): The epoch number to write the data for.
 
@@ -138,8 +150,7 @@ class AdversarialAnalytics:
             self.db.insert(self.table_name, data)
             self.reset_trackers()
         except ConnectionError as e:
-            if self.warned.get("connection_error",False):
+            if self.warned.get("connection_error", False):
                 return
             warnings.warn(f"Failed to connect to the database: {e}")
             self.warned["connection_error"] = True
-

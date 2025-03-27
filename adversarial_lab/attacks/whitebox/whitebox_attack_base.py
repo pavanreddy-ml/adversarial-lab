@@ -160,7 +160,7 @@ class WhiteBoxAttack(ABC):
             - The framework of the loss function is set to match the model's framework.
         """
 
-        if isinstance(loss, (str, None)):
+        if isinstance(loss, (str, type(None))):
             loss_class = LossRegistry.get(loss)
             self.loss = loss_class()
         elif isinstance(loss, Loss):
@@ -291,4 +291,5 @@ class WhiteBoxAttack(ABC):
             - Each constraint in `self.constraints` is applied in sequence.
         """
         for constraint in self.constraints:
-            constraint.apply(noise)
+            for n in noise:
+                constraint.apply(n)

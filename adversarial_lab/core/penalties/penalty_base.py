@@ -24,6 +24,10 @@ class Penalty(ABC):
     def set_value(self, 
                   value: LossType
                   ) -> None:
+        if value is None:
+            self.value = None
+            return
+        
         try:
             if self.framework == "torch":
                 self.value = value.item()

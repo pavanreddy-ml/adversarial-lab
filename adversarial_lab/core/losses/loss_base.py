@@ -40,7 +40,13 @@ class Loss(ABC):
         self.penalties = penalties
 
     @abstractmethod
-    def calculate(self, target: TensorType, predictions: TensorType, logits: TensorType, *args, **kwargs) -> LossType:
+    def calculate(self, 
+                  target: TensorType, 
+                  predictions: TensorType, 
+                  logits: TensorType, 
+                  noise: TensorType,
+                  *args, 
+                  **kwargs) -> LossType:
         """
         Calculates the loss value.
 
@@ -75,6 +81,7 @@ class Loss(ABC):
                 self.value = value.item()
             elif self.framework == "tf":
                 self.value = float(value.numpy())
+
         except Exception as e:
             if not self.warned:
                 self.warned = True
@@ -98,6 +105,31 @@ class Loss(ABC):
             raise ValueError("framework must be either 'tf' or 'torch'")
         self.framework = framework
         self.tensor_ops = TensorOps(framework)
+
+        for penalty in self.penalties:
+            penalty.set_framework(framework)
+
+    def _apply_penalties(self, 
+                         loss: LossType,
+                         noise: TensorType
+                         ) -> LossType:
+        """
+        Apply penalties to the loss value.
+
+        Args:
+            noise: The noise tensor.
+
+        Returns:
+            The loss value with penalties applied.
+
+        Note:
+            Each penalty function is called with the noise tensor, and the sum of the penalties is returned.
+        """
+        for penalty in self.penalties:
+            penalty = penalty.calculate(noise)
+            if penalty is not None:
+                loss += penalty
+        return loss
 
     def __repr__(self) -> str:
         """

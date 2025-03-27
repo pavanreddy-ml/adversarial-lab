@@ -19,10 +19,12 @@ class BinaryCrossEntropy(Loss):
                   target: TensorType,
                   predictions: TensorType,
                   logits: TensorType,
+                  noise: TensorType,
                   ) -> LossType:
         loss = self.tensor_ops.losses.binary_crossentropy(target=target, 
                                                           predictions=predictions, 
                                                           logits=logits, 
                                                           from_logits=self.from_logits)
+        self._apply_penalties(loss, noise)
         self.set_value(loss)
         return loss

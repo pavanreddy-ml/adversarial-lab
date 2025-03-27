@@ -19,10 +19,12 @@ class CategoricalCrossEntropy(Loss):
                   target: TensorType,
                   predictions: TensorType,
                   logits: TensorType,
+                  noise: TensorType,
                   ) -> LossType:
         loss = self.tensor_ops.losses.categorical_crossentropy(target=target,
                                                                predictions=predictions,
                                                                logits=logits,
                                                                from_logits=self.from_logits)
+        loss = self._apply_penalties(loss, noise)
         self.set_value(loss)
         return loss
