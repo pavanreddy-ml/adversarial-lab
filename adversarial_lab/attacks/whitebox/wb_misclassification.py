@@ -57,6 +57,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                **kwargs
                ) -> np.ndarray:
         verbose = kwargs.get("verbose", 1)
+        early_stop = kwargs.get("early_stop", True)
         addn_analytics_fields = addn_analytics_fields or {}
         super().attack(epochs, addn_analytics_fields, *args, **kwargs)
 
@@ -67,6 +68,8 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             strategy=strategy,
             binary_threshold=binary_threshold
         )
+
+        target_class = np.argmax(self.tensor_ops.remove_batch_dim(target_vector).numpy())
 
         # Initial stats
         self.analytics.update_post_epoch_values(loss=self.loss,
@@ -119,6 +122,10 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                                                     **addn_analytics_fields
                                                     )
             self.analytics.write(epoch_num=epoch)
+
+            if early_stop and predicted_class == target_class:
+                break
+
 
         self.analytics.update_post_attack_values(loss=self.loss,
                                                  raw_image=sample,
