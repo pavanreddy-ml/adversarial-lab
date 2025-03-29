@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from typing import Union, List, Any
+from typing import Union, List, Any, Callable
 from adversarial_lab.core.types import TensorType, TensorVariableType, LossType, OptimizerType
 
 
@@ -205,21 +205,26 @@ class TFOptimizers:
         )
     
     @staticmethod
-    def PGD(learning_rate: float = 0.001, projection_fn: Any = None) -> OptimizerType:
+    def PGD(learning_rate: float = 0.01,
+        projection_fn: Callable[[TensorType], TensorType] = None
+        ) -> OptimizerType:
+
         class PGDOptimizer(tf.keras.optimizers.Optimizer):
             def __init__(self, learning_rate=0.01, projection_fn=None, name="PGD", **kwargs):
-                super().__init__(name=name, **kwargs)
-                self._learning_rate = self._build_learning_rate(learning_rate)
+                super().__init__(name=name, learning_rate=learning_rate, **kwargs)
                 self.projection_fn = projection_fn
 
-            def update_step(self, gradient, variable):
-                variable.assign_sub(self._learning_rate * tf.sign(gradient))
+            def update_step(self, gradient, variable, learning_rate):
+                variable.assign_sub(learning_rate * tf.sign(gradient))
                 if self.projection_fn:
                     variable.assign(self.projection_fn(variable))
 
             def get_config(self):
                 config = super().get_config()
-                config.update({"learning_rate": float(tf.keras.backend.get_value(self._learning_rate))})
+                config.update({
+                    "learning_rate": float(tf.keras.backend.get_value(self._serialize_hyperparameter('learning_rate'))),
+                    "projection_fn": self.projection_fn
+                })
                 return config
 
         return PGDOptimizer(learning_rate=learning_rate, projection_fn=projection_fn)
