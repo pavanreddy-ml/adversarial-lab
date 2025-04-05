@@ -85,6 +85,6 @@ class PositionalMasking(Masking):
         self.limits = limits
             
     def _validate_shape(self, sample):
-        s = self._get_unbatched_sample(sample)
+        s = self.tensor_ops.remove_batch_dim(sample)
         if len(s.shape) != len(self.limits):
             raise ValueError(f"Limits for masking must match the number of dimensions in the sample. Expected {self.limits}, got {len(sample.shape)}.")

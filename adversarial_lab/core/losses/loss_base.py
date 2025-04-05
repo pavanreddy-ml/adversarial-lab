@@ -122,7 +122,7 @@ class Loss(ABC):
         Returns:
             The loss value with penalties applied.
 
-        Note:
+        Notes:
             Each penalty function is called with the noise tensor, and the sum of the penalties is returned.
         """
         for penalty in self.penalties:
@@ -130,6 +130,20 @@ class Loss(ABC):
             if penalty is not None:
                 loss += penalty
         return loss
+    
+    def __call__(self, 
+             target: TensorType, 
+             predictions: TensorType, 
+             logits: TensorType, 
+             noise: TensorType, 
+             *args, 
+             **kwargs) -> LossType:
+        return self.calculate(target, 
+                              predictions, 
+                              logits, 
+                              noise, 
+                              *args, 
+                              **kwargs)
 
     def __repr__(self) -> str:
         """

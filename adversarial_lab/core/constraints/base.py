@@ -20,8 +20,8 @@ class PostOptimizationConstraint(ABC):
         """
         Apply the constraint to the noise inplace.
 
-        Args:
-            noise: The noise to apply the constraint to.
+        Parameters:
+            noise (TensorVariableType): The noise to apply the constraint to.
         """
         pass
 
@@ -31,8 +31,8 @@ class PostOptimizationConstraint(ABC):
         """
         Set the framework for the constraint.
 
-        Args:
-            framework: The framework to set, tf or torch.
+        Parameters:
+            framework (str): The framework to set, tf or torch.
 
         Raises:
             ValueError: If the framework is not 'tf' or 'torch'.

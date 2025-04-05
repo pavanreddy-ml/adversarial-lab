@@ -235,7 +235,7 @@ class ALModelTF(ALModelBase):
                 tape.watch(n)
             perturbation = construct_perturbation_fn(noise)
             input = sample + perturbation
-            logits = self.model(input, training=True)
+            logits = self.model(input)
             preds = self.act(logits)
             loss_value = loss.calculate(
                 target=target_vector, predictions=preds, logits=logits, noise=perturbation) if loss else None

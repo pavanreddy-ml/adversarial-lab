@@ -18,11 +18,3 @@ class Masking(ABC):
             raise ValueError("framework must be either 'tf' or 'torch'")
         self.framework = framework
         self.tensor_ops = TensorOps(framework)
-
-    def _get_unbatched_sample(sample):
-        shape = sample.shape
-        if shape[0] == 1 or shape[0] is None:
-            return sample[0]
-        else:
-            return sample
-    

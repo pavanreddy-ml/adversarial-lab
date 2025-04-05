@@ -50,17 +50,11 @@ class CarliniWagnerAttack(AttacksBase):
                  learning_rate=0.01,
                  *args,
                  **kwargs):
-        optimizer = Adam(learning_rate=learning_rate)
-        noise_generator = AdditiveNoiseGenerator()
-        penalty = [LpNorm(p=2, lambda_val=1)]
-
-        loss = CWLoss(C=C, kappa=kappa, penalties=penalty)
-
         self.attacker = WhiteBoxMisclassification(
             model=model,
-            loss=loss,
-            optimizer=optimizer,
-            noise_generator=noise_generator,
+            loss=CWLoss(C=C, kappa=kappa, penalties=[LpNorm(p=2, lambda_val=1)]),
+            optimizer=Adam(learning_rate=learning_rate),
+            noise_generator=AdditiveNoiseGenerator(),
             preprocessing=preprocessing_fn,
             *args,
             **kwargs

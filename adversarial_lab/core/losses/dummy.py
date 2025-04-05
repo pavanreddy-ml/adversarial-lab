@@ -7,7 +7,7 @@ from typing import List
 
 class DummyLoss(Loss):
     """
-    Loss without any computation. Used for attacks that do not require a loss function like DeepFool, JSMA, etc.
+    Loss without any computation. Used for attacks that do not require a loss function like DeepFool, JSMA, etc or attacks that require the jacobian.
     """
     __dummy__ = True
 
@@ -18,7 +18,7 @@ class DummyLoss(Loss):
         """
         Initialize the dummy loss function.
 
-        Note:
+        Notes:
             value is set to 0 for tracking purposes.
 
         """

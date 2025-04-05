@@ -2,25 +2,27 @@ from .attacks_base import AttacksBase
 
 from adversarial_lab.attacks.whitebox import WhiteBoxMisclassification
 from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator
-from adversarial_lab.core.losses import CategoricalCrossEntropy
+from adversarial_lab.core.losses import CategoricalCrossEntropy, BinaryCrossEntropy
 from adversarial_lab.core.optimizers import PGD
 from adversarial_lab.core.constraints import POClip
 
 
 class ProjectedGradientDescentAttack(AttacksBase):
-    def __init__(self, model, preprocessing_fn, learning_rate= 0.01, epsilon=0.1, *args, **kwargs):
-        optimizer = PGD(learning_rate=learning_rate)
-        noise_generator = AdditiveNoiseGenerator()
-
-        constraint = [POClip(min=-epsilon, max=epsilon)]
-
+    def __init__(self, 
+                 model, 
+                 preprocessing_fn, 
+                 learning_rate= 0.01, 
+                 epsilon=0.1, 
+                 binary=False, 
+                 *args, 
+                 **kwargs):
         self.attacker = WhiteBoxMisclassification(
             model=model,
-            loss=CategoricalCrossEntropy(),
-            optimizer=optimizer,
-            noise_generator=noise_generator,
+            loss=CategoricalCrossEntropy() if not binary else BinaryCrossEntropy(),
+            optimizer=PGD(learning_rate=learning_rate),
+            noise_generator=AdditiveNoiseGenerator(),
             preprocessing=preprocessing_fn,
-            constraints=constraint,
+            constraints=[POClip(min=-epsilon, max=epsilon)],
             *args,
             **kwargs
         )
