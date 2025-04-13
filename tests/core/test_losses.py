@@ -8,7 +8,7 @@ from adversarial_lab.core.losses import *
 @pytest.mark.parametrize("framework", ["torch", "tf"])
 def test_loss_instantiation(framework):
     class DummyLoss(Loss):
-        def calculate(self, target, predictions, logits, *args, **kwargs):
+        def calculate(self, target, predictions, logits, noise, *args, **kwargs):
             pass
     
     loss = DummyLoss()
@@ -28,7 +28,7 @@ def test_loss_invalid_framework():
 
 def test_loss_has_calculate():
     class DummyLoss(Loss):
-        def calculate(self, target, predictions, logits, *args, **kwargs):
+        def calculate(self, target, predictions, logits, noise, *args, **kwargs):
             pass
     
     loss = DummyLoss()
@@ -43,13 +43,15 @@ def test_binary_cross_entropy(framework):
         target = tf.constant([0, 1, 1], dtype=tf.float32)
         predictions = tf.constant([0.1, 0.9, 0.8], dtype=tf.float32)
         logits = tf.constant([0.0, 2.0, 1.5], dtype=tf.float32)
+        noise = tf.constant([0.1, 0.2, 0.3], dtype=tf.float32)
     else:
         target = torch.tensor([0, 1, 1], dtype=torch.float32)
         predictions = torch.tensor([0.1, 0.9, 0.8], dtype=torch.float32)
         logits = torch.tensor([0.0, 2.0, 1.5], dtype=torch.float32)
+        noise = torch.tensor([0.1, 0.2, 0.3], dtype=torch.float32)
     
     try:
-        loss = loss_fn.calculate(target, predictions, logits)
+        loss = loss_fn.calculate(target, predictions, logits, noise)
     except NotImplementedError:
         pass
     assert loss_fn.value is not None
@@ -63,13 +65,15 @@ def test_categorical_cross_entropy(framework):
         target = tf.constant([[0, 1, 0], [1, 0, 0]], dtype=tf.float32)
         predictions = tf.constant([[0.1, 0.8, 0.1], [0.7, 0.2, 0.1]], dtype=tf.float32)
         logits = tf.constant([[0.0, 2.0, -1.0], [1.5, -0.5, -1.0]], dtype=tf.float32)
+        noise = tf.constant([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], dtype=tf.float32)
     else:
         target = torch.tensor([[0, 1, 0], [1, 0, 0]], dtype=torch.float32)
         predictions = torch.tensor([[0.1, 0.8, 0.1], [0.7, 0.2, 0.1]], dtype=torch.float32)
         logits = torch.tensor([[0.0, 2.0, -1.0], [1.5, -0.5, -1.0]], dtype=torch.float32)
+        noise = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], dtype=torch.float32)
     
     try:
-        loss = loss_fn.calculate(target, predictions, logits)
+        loss = loss_fn.calculate(target, predictions, logits, noise)
     except NotImplementedError:
         pass
     assert loss_fn.value is not None
@@ -82,12 +86,14 @@ def test_mean_absolute_error(framework):
     if framework == "tf":
         target = tf.constant([1.0, 2.0, 3.0], dtype=tf.float32)
         predictions = tf.constant([1.5, 1.8, 2.5], dtype=tf.float32)
+        noise = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], dtype=torch.float32)
     else:
         target = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32)
         predictions = torch.tensor([1.5, 1.8, 2.5], dtype=torch.float32)
+        noise = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], dtype=torch.float32)
     
     try:
-        loss = loss_fn.calculate(target, predictions, None)
+        loss = loss_fn.calculate(target, predictions, None, noise)
     except NotImplementedError:
         pass
     assert loss_fn.value is not None
@@ -100,12 +106,14 @@ def test_mean_squared_error(framework):
     if framework == "tf":
         target = tf.constant([1.0, 2.0, 3.0], dtype=tf.float32)
         predictions = tf.constant([1.5, 1.8, 2.5], dtype=tf.float32)
+        noise = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], dtype=torch.float32)
     else:
         target = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32)
         predictions = torch.tensor([1.5, 1.8, 2.5], dtype=torch.float32)
+        noise = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], dtype=torch.float32)
     
     try:
-        loss = loss_fn.calculate(target, predictions, None)
+        loss = loss_fn.calculate(target, predictions, None, noise)
     except NotImplementedError:
         pass
     assert loss_fn.value is not None
@@ -135,8 +143,9 @@ def test_loss_from_function(function_type):
         target = tf.constant([1.0, 2.0], dtype=tf.float32)
         predictions = tf.constant([2.0, 3.0], dtype=tf.float32)
         logits = tf.constant([0.0, 0.0], dtype=tf.float32)
+        noise = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], dtype=torch.float32)
 
-        result = loss.calculate(target, predictions, logits)
+        result = loss.calculate(target, predictions, logits, noise)
 
         assert np.array_equal(result.numpy(), [1.0, 1.0])
 

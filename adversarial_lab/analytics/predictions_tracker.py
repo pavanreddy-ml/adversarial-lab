@@ -1,6 +1,7 @@
 from typing import Dict, List, Literal
 from . import Tracker
 
+import warnings
 import numpy as np
 
 
@@ -23,7 +24,7 @@ class PredictionsTracker(Tracker):
         self.indexes = None
         self.strategy = "first_topk"
 
-        if strategy == "all":           # Just for code readability
+        if strategy == "all":
             self.strategy = "all"
         elif strategy == "first_topk":
             self.topk = topk
@@ -45,14 +46,22 @@ class PredictionsTracker(Tracker):
         if not self.track_batch:
             return
         
-        self._initialize_index(predictions)
+        self._initialize_index(predictions[0])
 
-        for i, value in enumerate(predictions):
-            if self.indexes[i] == 1:
-                if i not in self.epoch_predictions_by_batch:
-                    self.epoch_predictions_by_batch[i] = []
-                self.epoch_predictions_by_batch[i].append(round(float(value), self.round_to))
-                
+        if len(self.epoch_predictions_by_batch) == 0:
+            epoch_val = -1
+        else:
+            epoch_val = max(self.epoch_predictions_by_batch.keys()) + 1
+            
+        self.epoch_predictions_by_batch[epoch_val] = [] 
+
+        for i, prediction in predictions:
+            batch_item_preds = {}
+            for idx, value in enumerate(prediction):
+                if self.indexes[idx] == 1:
+                    batch_item_preds[idx] = round(float(value), self.round_to)
+            self.epoch_predictions_by_batch[epoch_val].append(batch_item_preds)
+
     def post_epoch(self,
                    *args,
                    **kwargs
@@ -64,9 +73,9 @@ class PredictionsTracker(Tracker):
         
         self._initialize_index(predictions)
 
-        for i, value in enumerate(predictions):
-            if self.indexes[i] == 1:
-                self.epoch_predictions[i] = round(float(value), self.round_to)
+        for idx, value in enumerate(predictions):
+            if self.indexes[idx] == 1:
+                self.epoch_predictions[idx] = round(float(value), self.round_to)
 
     def _initialize_index(self, 
                           predictions: np.ndarray
@@ -84,7 +93,8 @@ class PredictionsTracker(Tracker):
                 self.indexes[np.argsort(preds)[-self.topk:]] = 1
             elif self.strategy == "custom":
                 if max(self.custom_indexes) >= len(preds):
-                    raise ValueError(f"Index {max(self.custom_indexes)} in Custom indexes is out of bounds")
+                    warnings.warn(f"Index {max(self.custom_indexes)} in Custom indexes is out of bounds")
+                    self.custom_indexes = [i for i in self.custom_indexes if i < len(preds)]
                 self.indexes = np.zeros_like(preds)
                 self.indexes[self.custom_indexes] = 1
 
@@ -103,5 +113,5 @@ class PredictionsTracker(Tracker):
     
     def reset_values(self) -> None:
         self.epoch_predictions = {}
-        self.epoch_predictions_by_batch: Dict[str, List] = {}
+        self.epoch_predictions_by_batch: Dict[int, List[Dict[int, float]]] = {}
 

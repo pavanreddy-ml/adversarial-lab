@@ -15,10 +15,6 @@ class ImageTracker(Tracker):
         "preprocessed_image": "blob",
         "true_noise_raw_image": "blob",
         "true_noise_preprocessed_image": "blob",
-        "normalized_noise_raw_image": "blob",
-        "normalized_noise_preprocessed_image": "blob",
-        "noised_raw_image": "blob",
-        "noised_preprocessed_image": "blob"
     }
 
     def __init__(self,
@@ -26,31 +22,16 @@ class ImageTracker(Tracker):
                  track_preprocessed_image: bool = True,
                  track_true_noise_raw_image: bool = True,
                  track_true_noise_preprocessed_image: bool = True,
-                 track_normalized_noise_raw_image: bool = True,
-                 track_normalized_noise_preprocessed_image: bool = True,
-                 track_nooised_raw_image: bool = True,
-                 track_noised_preprocessed_image: bool = True,
                  ) -> None:
         super().__init__()
         self.track_raw_image = track_raw_image
         self.track_preprocessed_image = track_preprocessed_image
         self.track_true_noise_raw_image = track_true_noise_raw_image
         self.track_true_noise_preprocessed_image = track_true_noise_preprocessed_image
-        self.track_normalized_noise_raw_image = track_normalized_noise_raw_image
-        self.track_normalized_noise_preprocessed_image = track_normalized_noise_preprocessed_image
-        self.track_noised_raw_image = track_nooised_raw_image
-        self.track_noised_preprocessed_image = track_noised_preprocessed_image
 
         self.warned = False
 
-
-    def post_epoch(self,
-                   *args,
-                   **kwargs
-                   ) -> None:
-        if not self.track_epoch:
-            return
-
+    def pre_attack(self, *args, **kwargs):
         raw_image = kwargs.get("raw_image", None)
         preprocessed_image = kwargs.get("preprocessed_image", None)
         noise_raw_image = kwargs.get("noise_raw", None)
@@ -68,23 +49,20 @@ class ImageTracker(Tracker):
         if self.track_true_noise_preprocessed_image:
             self.data["true_noise_preprocessed_image"] = self._numpy_to_pickle_bytes(noise_preprocessed_image)
 
-        if self.track_normalized_noise_raw_image:
-            self.data["normalized_noise_raw_image"] = self._numpy_to_png_bytes(noise_raw_image, normalize=True)
+    def post_epoch(self,
+                   *args,
+                   **kwargs
+                   ) -> None:
+        if not self.track_epoch:
+            return
+        noise_raw_image = kwargs.get("noise_raw", None)
+        noise_preprocessed_image = kwargs.get("noise_preprocessed_image", None)
 
-        if self.track_normalized_noise_preprocessed_image:
-            self.data["normalized_noise_preprocessed_image"] = self._numpy_to_png_bytes(noise_preprocessed_image, normalize=True)
+        if self.track_true_noise_raw_image:
+            self.data["true_noise_raw_image"] = self._numpy_to_pickle_bytes(noise_raw_image)
 
-        if self.track_noised_raw_image:
-            if raw_image is None or noise_raw_image is None:
-                self.data["noised_raw_image"] = None
-            else:
-                self.data["noised_raw_image"] = self._numpy_to_png_bytes(raw_image + noise_raw_image)
-
-        if self.track_noised_preprocessed_image:
-            if preprocessed_image is None or noise_preprocessed_image is None:
-                self.data["noised_preprocessed_image"] = None
-            else:
-                self.data["noised_preprocessed_image"] = self._numpy_to_pickle_bytes(preprocessed_image + noise_preprocessed_image)
+        if self.track_true_noise_preprocessed_image:
+            self.data["true_noise_preprocessed_image"] = self._numpy_to_pickle_bytes(noise_preprocessed_image)
 
         if not self.warned:
             self.warned = True
@@ -104,18 +82,6 @@ class ImageTracker(Tracker):
         if self.track_true_noise_preprocessed_image:
             data["true_noise_preprocessed_image"] = self.data["true_noise_preprocessed_image"]
 
-        if self.track_normalized_noise_raw_image:
-            data["normalized_noise_raw_image"] = self.data["normalized_noise_raw_image"]
-
-        if self.track_normalized_noise_preprocessed_image:
-            data["normalized_noise_preprocessed_image"] = self.data["normalized_noise_preprocessed_image"]
-
-        if self.track_noised_raw_image:
-            data["noised_raw_image"] = self.data["noised_raw_image"]
-
-        if self.track_noised_preprocessed_image:
-            data["noised_preprocessed_image"] = self.data["noised_preprocessed_image"]
-
         return data
 
     def reset_values(self) -> None:
@@ -124,10 +90,6 @@ class ImageTracker(Tracker):
         "preprocessed_image": None,
         "true_noise_raw_image": None,
         "true_noise_preprocessed_image": None,
-        "normalized_noise_raw_image": None,
-        "normalized_noise_preprocessed_image": None,
-        "noised_raw_image": None,
-        "noised_preprocessed_image": None,
     }
         
     def _remove_batch_dimension(self,

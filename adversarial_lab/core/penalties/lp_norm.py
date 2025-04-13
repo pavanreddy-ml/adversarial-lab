@@ -29,4 +29,4 @@ class LpNorm(Penalty):
         return lp_norm  
 
     def __repr__(self) -> str:
-        return super().__repr__() + f" p: {self.p}, lambda: {self.lambda_val}"
+        return super().__repr__() + f" p={self.p}; lambda={self.lambda_val}"

@@ -88,3 +88,8 @@ class PositionalMasking(Masking):
         s = self.tensor_ops.remove_batch_dim(sample)
         if len(s.shape) != len(self.limits):
             raise ValueError(f"Limits for masking must match the number of dimensions in the sample. Expected {self.limits}, got {len(sample.shape)}.")
+
+    def _get_unbatched_sample(self, sample: np.ndarray) -> np.ndarray:
+        if sample.shape[0] == 1 or sample.shape[0] == None:
+            return sample[0]
+        return sample

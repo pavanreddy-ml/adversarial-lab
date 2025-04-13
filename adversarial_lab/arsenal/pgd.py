@@ -14,6 +14,7 @@ class ProjectedGradientDescentAttack(AttacksBase):
                  learning_rate= 0.01, 
                  epsilon=0.1, 
                  binary=False, 
+                 verbose=2,
                  *args, 
                  **kwargs):
         self.attacker = WhiteBoxMisclassification(
@@ -23,6 +24,7 @@ class ProjectedGradientDescentAttack(AttacksBase):
             noise_generator=AdditiveNoiseGenerator(),
             preprocessing=preprocessing_fn,
             constraints=[POClip(min=-epsilon, max=epsilon)],
+            verbose=verbose,
             *args,
             **kwargs
         )

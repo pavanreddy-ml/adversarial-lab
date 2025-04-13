@@ -6,6 +6,7 @@ import warnings
 from . import WhiteBoxAttack
 from adversarial_lab.core import ALModel
 from adversarial_lab.core.losses import Loss
+from adversarial_lab.callbacks import Callback
 from adversarial_lab.core.optimizers import Optimizer
 from adversarial_lab.analytics import AdversarialAnalytics
 from adversarial_lab.exceptions import VectorDimensionsError
@@ -13,7 +14,7 @@ from adversarial_lab.core.preprocessing import Preprocessing
 from adversarial_lab.core.noise_generators import NoiseGenerator
 from adversarial_lab.core.constraints import PostOptimizationConstraint
 
-from typing import Optional, Union, Literal
+from typing import Optional, Union, Literal, List
 from adversarial_lab.core.types import TensorType, ModelType
 
 
@@ -32,7 +33,9 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                  noise_generator: Optional[NoiseGenerator] = None,
                  preprocessing: Optional[Preprocessing] = None,
                  constraints: Optional[PostOptimizationConstraint] = None,
+                 callbacks: Optional[List[Callback]] = None,
                  analytics: Optional[AdversarialAnalytics] = None,
+                 verbose: int = 1,
                  *args,
                  **kwargs) -> None:
         super().__init__(model=model,
@@ -41,7 +44,9 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                          noise_generator=noise_generator,
                          preprocessing=preprocessing,
                          constraints=constraints,
+                         callbacks=callbacks,
                          analytics=analytics,
+                         verbose=verbose,
                          *args,
                          **kwargs)
 
@@ -56,10 +61,8 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                *args,
                **kwargs
                ) -> np.ndarray:
-        verbose = kwargs.get("verbose", 1)
-        early_stop = kwargs.get("early_stop", True)
+        super().attack(epochs, *args, **kwargs)
         addn_analytics_fields = addn_analytics_fields or {}
-        super().attack(epochs, addn_analytics_fields, *args, **kwargs)
 
         preprocessed_sample, predictions, noise_meta, target_vector = self._initialize_attack(
             sample=sample,
@@ -69,20 +72,20 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             binary_threshold=binary_threshold
         )
 
+        true_class = np.argmax(self.tensor_ops.remove_batch_dim(predictions).numpy())
         target_class = np.argmax(self.tensor_ops.remove_batch_dim(target_vector).numpy())
 
         # Initial stats
-        self.analytics.update_post_epoch_values(loss=self.loss,
-                                                raw_image=sample,
-                                                preprocessed_image=self.tensor_ops.remove_batch_dim(
-                                                    preprocessed_sample).numpy(),
-                                                noise_preprocessed_image=self.noise_generator.get_noise(
-                                                    noise_meta),
-                                                predictions=self.tensor_ops.remove_batch_dim(
-                                                    predictions).numpy(),
-                                                **addn_analytics_fields
-                                                )
-        self.analytics.write(epoch_num=0)
+        self._update_analytics(
+            when="pre_train",
+            loss=self.loss,
+            raw_image=sample,
+            preprocessed_image=self.tensor_ops.remove_batch_dim(preprocessed_sample).numpy(),
+            noise_preprocessed_image=self.noise_generator.get_noise(noise_meta),
+            predictions=self.tensor_ops.remove_batch_dim(predictions).numpy(),
+            **addn_analytics_fields
+        )
+
 
         for epoch in range(epochs):
             grads, jacobian = self.model.calculate_gradients(
@@ -102,42 +105,34 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             self._apply_constrains(noise_meta)
 
             # Stats
-            predictions = self.model.predict(preprocessed_sample + self.noise_generator.construct_perturbation(noise_meta))
-            predictions = self.tensor_ops.remove_batch_dim(predictions)
-            predicted_class = np.argmax(predictions)
-            predicted_class_confidence = predictions[predicted_class].numpy()
-            self.progress_bar.update(1)
-            if verbose >= 2:
-                self.progress_bar.set_postfix(
-                    {'Loss': self.loss.value, 'Prediction': predicted_class, 'Prediction Confidence': predicted_class_confidence})
+            
+            self._update_progress_bar(
+                preprocessed_sample=preprocessed_sample, 
+                noise_meta=noise_meta,
+                true_class=true_class,
+                target_class=target_class,
+            )
 
-            self.analytics.update_post_epoch_values(loss=self.loss,
-                                                    raw_image=sample,
-                                                    preprocessed_image=self.tensor_ops.remove_batch_dim(
-                                                        preprocessed_sample).numpy(),
-                                                    noise_preprocessed_image=self.noise_generator.get_noise(
-                                                        noise_meta),
-                                                    predictions=self.tensor_ops.remove_batch_dim(
-                                                        predictions).numpy(),
-                                                    **addn_analytics_fields
-                                                    )
-            self.analytics.write(epoch_num=epoch)
+            self._update_analytics(
+                when="post_epoch",
+                epoch=epoch+1,
+                loss=self.loss,
+                raw_image=sample,
+                preprocessed_image=self.tensor_ops.remove_batch_dim(preprocessed_sample).numpy(),
+                noise_preprocessed_image=self.noise_generator.get_noise(noise_meta),
+                predictions=self.tensor_ops.remove_batch_dim(predictions).numpy(),
+                **addn_analytics_fields
+            )
 
-            if early_stop and predicted_class == target_class:
-                break
-
-
-        self.analytics.update_post_attack_values(loss=self.loss,
-                                                 raw_image=sample,
-                                                 preprocessed_image=self.tensor_ops.remove_batch_dim(
-                                                     preprocessed_sample).numpy(),
-                                                 noise_preprocessed_image=self.noise_generator.get_noise(
-                                                     noise_meta),
-                                                 predictions=self.tensor_ops.remove_batch_dim(
-                                                     predictions).numpy(),
-                                                **addn_analytics_fields
-                                                 )
-        self.analytics.write(epoch_num=9999999)
+        self._update_analytics(
+            when="post_train",
+            loss=self.loss,
+            raw_image=sample,
+            preprocessed_image=self.tensor_ops.remove_batch_dim(preprocessed_sample).numpy(),
+            noise_preprocessed_image=self.noise_generator.get_noise(noise_meta),
+            predictions=self.tensor_ops.remove_batch_dim(predictions).numpy(),
+            **addn_analytics_fields
+        )
 
         return self.noise_generator.get_noise(noise_meta), noise_meta
 

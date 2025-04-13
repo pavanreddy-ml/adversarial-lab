@@ -1,5 +1,6 @@
 from abc import ABC
 
+import sys
 import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
@@ -13,7 +14,7 @@ from adversarial_lab.core.optimizers import Optimizer, OptimizerRegistry
 from adversarial_lab.core.preprocessing import NoPreprocessing, Preprocessing
 from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator, NoiseGenerator
 
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Literal
 
 
 class WhiteBoxAttack(ABC):
@@ -29,6 +30,7 @@ class WhiteBoxAttack(ABC):
                  preprocessing: Optional[Preprocessing] = None,
                  constraints: Optional[List[PostOptimizationConstraint]] = None,
                  analytics: Optional[AdversarialAnalytics] = None,
+                 verbose: int = 1,
                  *args,
                  **kwargs
                  ) -> None:
@@ -83,6 +85,10 @@ class WhiteBoxAttack(ABC):
 
         self.tensor_ops = TensorOps(framework=self.framework)
 
+        self.verbose = verbose
+
+        self.progress_bar = None
+
     def attack(self,
                epochs: int,
                *args,
@@ -104,9 +110,16 @@ class WhiteBoxAttack(ABC):
             np.ndarray: The adversarial noise generated during the attack.
         """
         self._initialize_optimizer(self._optimizer_arg)
-        verbose = kwargs.get("verbose", 1)
+
+        if "ipykernel" in sys.modules or "google.colab" in sys.modules:
+            from IPython.display import clear_output
+            clear_output(wait=True)
+
+        if hasattr(self, "progress_bar"):
+            del self.progress_bar
+
         self.progress_bar = tqdm(
-            total=epochs, desc="Attacking", leave=True, disable=(verbose == 0))
+            total=epochs, desc="Attacking", leave=True, disable=(self.verbose == 0))
 
     def _initialize_optimizer(self, optimizer):
         """
@@ -280,6 +293,13 @@ class WhiteBoxAttack(ABC):
             self.analytics = AdversarialAnalytics(
                 db=None, trackers=[], table_name=None)
 
+        self.analytics_function_map = {
+            "pre_train": self.analytics.update_pre_attack_values,
+            "post_batch": self.analytics.update_post_batch_values,
+            "post_epoch": self.analytics.update_post_epoch_values,
+            "post_train": self.analytics.update_post_attack_values
+        }
+
     def _apply_constrains(self, noise):
         """
         Apply all constraints to the noise tensor.
@@ -293,3 +313,69 @@ class WhiteBoxAttack(ABC):
         for constraint in self.constraints:
             for n in noise:
                 constraint.apply(n)
+
+    def _update_analytics(self,
+                          when: Literal["pre_train", "post_batch", "post_epoch", "post_train"],
+                          loss=None,
+                          raw_image=None,
+                          preprocessed_image=None,
+                          noise_preprocessed_image=None,
+                          predictions=None,
+                          *args,
+                          **kwargs):
+        if when not in ["pre_train", "post_batch", "post_epoch", "post_train"]:
+            raise ValueError(
+                "Invalid value for 'when'. Must be one of ['pre_train', 'post_batch', 'post_epoch', 'post_train'].")
+
+        if when in ["post_epoch", "post_batch"]:
+            epoch = kwargs.get("epoch", None)
+            if epoch is None:
+                raise ValueError(
+                    "Epoch number must be provided for 'post_epoch' and 'post_batch' analytics.")
+        elif when == "pre_train":
+            epoch = 0
+        elif when == "post_train":
+            epoch = 99999999
+
+        analytics_func = self.analytics_function_map[when]
+
+        analytics_func(
+            loss=loss,
+            raw_image=raw_image,
+            preprocessed_image=preprocessed_image,
+            noise_preprocessed_image=noise_preprocessed_image,
+            predictions=predictions,
+            *args,
+            **kwargs
+        )
+
+        if when != "post_batch":
+            self.analytics.write(epoch_num=epoch)
+
+    def _update_progress_bar(self, preprocessed_sample, noise_meta, true_class, target_class):
+        predictions = self.tensor_ops.remove_batch_dim(self.model.predict(preprocessed_sample + self.noise_generator.construct_perturbation(noise_meta)))
+        
+        predicted_class = np.argmax(predictions)
+        predicted_class_confidence = predictions[predicted_class].numpy()
+
+        true_class_confidence = predictions[true_class].numpy()
+        target_class_confidence = predictions[target_class].numpy()
+
+        loss = self.loss.get_total_loss()
+        
+        self.progress_bar.update(1)
+        if self.verbose == 2:
+            self.progress_bar.set_postfix(
+                {
+                    'Loss': loss,
+                    'Prediction (score)': f"{predicted_class}({predicted_class_confidence:.3f})",
+                })
+        if self.verbose >= 3:
+            self.progress_bar.set_postfix(
+                {
+                    'Loss': loss,
+                    'Prediction (score)': f"{predicted_class}({predicted_class_confidence:.3f})",
+                    'Original Class (score)': f"{true_class}({true_class_confidence:.3f})",
+                    'Target Class (score)': f"{target_class}({target_class_confidence:.3f})",
+                })
+

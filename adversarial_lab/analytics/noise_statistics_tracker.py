@@ -18,7 +18,7 @@ class NoiseStatisticsTracker(Tracker):
                  track_std: bool = True,
                  track_min: bool = True,
                  track_max: bool = True,
-                 round_to: int = 4
+                 round_to: int = 8
                  ) -> None:
         super().__init__(track_batch=track_batch, track_epoch=track_epoch)
         self.track_mean = track_mean

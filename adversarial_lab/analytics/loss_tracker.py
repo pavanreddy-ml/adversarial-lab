@@ -22,7 +22,8 @@ class LossTracker(Tracker):
                    *args,
                    **kwargs
                    ) -> None:
-        loss = kwargs["loss"]
+        loss: Loss = kwargs["loss"]
+        
         if not self.track_batch:
             return
 
@@ -35,12 +36,14 @@ class LossTracker(Tracker):
                 if penalty_name not in self.epoch_losses_by_batch:
                     self.epoch_losses_by_batch[f"{i+1}_{repr(penalty)}"] = []
                 self.epoch_losses_by_batch[penalty_name] = penalty.value
+
+        self.epoch_losses_by_batch["Total Loss"] = sum(self.epoch_losses_by_batch.values())
         
     def post_epoch(self,
                    *args,
                    **kwargs
                    ) -> None:
-        loss = kwargs["loss"]
+        loss: Loss = kwargs["loss"]
 
         if not self.track_epoch:
             return
@@ -50,8 +53,10 @@ class LossTracker(Tracker):
 
         if loss is not None and self.track_penalties:
             for i, penalty in enumerate(loss.penalties):
-                penalty_name = f"Penalty {i+1}_{repr(penalty)}"
+                penalty_name = f"Penalty {i+1}:{repr(penalty)}"
                 self.epoch_losses[penalty_name] = penalty.value
+
+        self.epoch_losses["Total Loss"] = sum(self.epoch_losses.values())
 
     def serialize(self) -> Dict:
         data = {}

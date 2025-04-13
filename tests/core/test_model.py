@@ -132,11 +132,11 @@ def test_tf_model_calculate_gradients():
     al_model = ALModelTF(model)
 
     class DummyLoss:
-        def calculate(self, target, predictions, logits):
+        def calculate(self, target, predictions, logits, noise):
             return tf.reduce_mean((target - predictions) ** 2)
 
-    def dummy_noise_fn(sample, noise):
-        return sample + sum(noise)
+    def dummy_noise_fn(sample):
+        return sample + 0.1 * tf.random.normal(tf.shape(sample))
 
     sample = tf.random.normal((1, 10))
     noise = [tf.Variable(tf.random.normal((1, 10))) for _ in range(2)]

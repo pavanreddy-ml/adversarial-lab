@@ -8,12 +8,12 @@ class PreprocessingFromFunction:
         sig = inspect.signature(function)
         params = sig.parameters
         
-        has_data_arg = 'data' in params
+        has_sample_arg = 'sample' in params
         has_args = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in params.values())
         has_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
 
-        if not has_data_arg:
-            raise TypeError("Function to create POCoPreprocessingnstraint must have parameter: 'data'.")
+        if not has_sample_arg:
+            raise TypeError("Function to create Preprocessing must have parameter: 'sample'.")
 
         if not has_args:
             raise TypeError("Function to create Preprocessing must have parameter: '*args'.")

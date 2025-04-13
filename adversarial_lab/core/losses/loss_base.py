@@ -88,6 +88,13 @@ class Loss(ABC):
                 warnings.warn(f"Error while setting value: {e}. Traceback: {traceback.format_exc()}")
             self.value = None
 
+    def get_total_loss(self) -> float:
+        loss = self.value
+        for penalty in self.penalties:
+            loss += penalty.value
+        return loss
+
+
     def set_framework(self, framework: Literal["tf", "torch"]) -> None:
         """
         Set the framework for the constraint.
