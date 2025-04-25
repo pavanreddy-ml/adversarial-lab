@@ -13,25 +13,31 @@ class DeepFoolNoiseGeenerator(AdditiveNoiseGenerator):
                         optimizer,
                         grads,
                         jacobian,
-                        preds,
+                        predictions,
                         target_vector
                         ) -> None:
         noise = noise_meta[0]
-        assert preds is not None and target_vector is not None
 
-        f_0 = tf.tensordot(target_vector, jacobian, axes=1)  # shape: input_shape
-        f_k_diff = tf.reduce_sum((preds - target_vector))
-        w_k = tf.tensordot(tf.ones_like(target_vector), jacobian, axes=1) - f_0
-        norm_w_k = tf.norm(tf.reshape(w_k, [-1]), ord=2)
+        jacobian_tensor = self.tensor_ops.remove_batch_dim(jacobian[0], axis=0)  # shape: [num_classes, *input_shape]
+        predictions = self.tensor_ops.remove_batch_dim(predictions, axis=0)  # shape: [num_classes]
+        target_vector = self.tensor_ops.remove_batch_dim(target_vector, axis=0)  # shape: [num_classes]
+
+        J_pred = self.tensor_ops.tensordot(predictions, jacobian_tensor, axes=[[0], [0]])  # shape: input_shape
+        J_target = self.tensor_ops.tensordot(target_vector, jacobian_tensor, axes=[[0], [0]])  # shape: input_shape
+
+        w_k = J_target - J_pred
+        f_k_diff = self.tensor_ops.tensordot((target_vector - predictions), predictions, axes=1)  # scalar
+
+        w_k_flat = self.tensor_ops.reshape(w_k, [-1])
+        norm_w_k = self.tensor_ops.norm(w_k_flat, p=2)
 
         if norm_w_k == 0:
             return
 
-        r_k = tf.abs(f_k_diff) / norm_w_k * (w_k / norm_w_k)
-        noise.assign_add(r_k)
+        r_k = self.tensor_ops.abs(f_k_diff) / norm_w_k * (w_k / norm_w_k)
+        noise.assign(noise + r_k)
 
-
-class ProjectedGradientDescentAttack(AttacksBase):
+class DeepFoolAttack(AttacksBase):
     def __init__(self,
                  model,
                  preprocessing_fn,
@@ -45,7 +51,7 @@ class ProjectedGradientDescentAttack(AttacksBase):
             model=model,
             loss=CategoricalCrossEntropy() if not binary else BinaryCrossEntropy(),
             optimizer=PGD(learning_rate=learning_rate),
-            noise_generator=DeepFoolNoiseGeenerator(),
+            noise_generator=DeepFoolNoiseGeenerator(requires_jacobian=True),
             preprocessing=preprocessing_fn,
             constraints=[POClip(min=-epsilon, max=epsilon)],
             verbose=verbose,

@@ -1,18 +1,33 @@
 from . import Callback
 
+import numpy as np
+from adversarial_lab.core.losses import Loss
+
+from typing import Literal, Dict, Optional
+
 
 class EarlyStopping(Callback):
-    def __init__(self, patience: int = 5, threshold: float = 0.0, on=""):
-        super().__init__()
-        self.patience = patience
-        self.threshold = threshold
-        self.best_loss = float('inf')
-        self.counter = 0
-        self.on = on
-        self.early_stop = False
+    def __init__(self, 
+                 trigger: Literal["misclassification", "targeted_misclassification", "confidence_reduction", "loss_convergence", "prediction_convergence"],
+                 patience: int = 1, 
+                 epsilon: float = 1e-3,
+                 *args,
+                 **kwargs
+                 ):
+        super().__init__(trigger=trigger, 
+                         blocking=True,
+                         patience=patience,
+                         epsilon=epsilon,
+                         max_triggers=1,
+                         *args,
+                         **kwargs)
 
-    def on_epoch_end(self):
-        pass
-
-    def on_batch_end(self):
-        pass
+    def on_epoch_end(self,
+                     predictions: np.ndarray,
+                     true_class: int,
+                     target_class: int,
+                     loss: Loss) -> Optional[Dict[str, bool]]:
+        if self.is_triggered(predictions, true_class, target_class, loss):
+            return {
+                "stop_attack": True,
+            }

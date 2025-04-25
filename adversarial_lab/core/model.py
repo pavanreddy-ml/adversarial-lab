@@ -8,7 +8,8 @@ from copy import deepcopy
 import sys
 import importlib
 import numpy as np
-from typing import Dict, Any, List, Tuple, Callable, TYPE_CHECKING
+from typing import Dict, Any, List, Tuple, Callable, TYPE_CHECKING, Optional
+import warnings
 
 tf = None
 torch = None
@@ -41,11 +42,19 @@ class ALModelMeta(ABCMeta):
 class ALModelBase(ABC):
     def __init__(self,
                  model: ModelType,
-                 framework: str) -> None:
+                 framework: str,
+                 efficient_mode: bool = False) -> None:
         self.model = deepcopy(model)
         self.model_info = self.get_info(self.model)
         self.framework = framework
         self._compute_jacobian = False
+        
+        
+        self.efficient_mode = efficient_mode
+        if self.efficient_mode:
+            warnings.warn("You are using an efficient mode. This works only on hard targets. "
+            "Soft targets will raise an IncomaptibilityError.")
+    
 
     @abstractmethod
     def get_info(self, model) -> Dict[str, Any]:
@@ -57,12 +66,13 @@ class ALModelBase(ABC):
                             noise: List[TensorVariableType],
                             apply_noise_fn: Callable,
                             target_vector: TensorType,
-                            loss: LossType
+                            loss: LossType,
+                            preprocess_fn: Optional[Callable] = None
                             ) -> Tuple[TensorType, TensorType]:
         pass
 
     @abstractmethod
-    def predict(self, x: TensorType | np.ndarray) -> Any:
+    def predict(self, x: TensorType | np.ndarray, preprocess_fn: Optional[Callable] = None) -> Any:
         pass
 
     @abstractmethod
@@ -77,8 +87,9 @@ class ALModelBase(ABC):
 
 class ALModelTorch(ALModelBase):
     def __init__(self,
-                 model: ModelType) -> None:
-        super().__init__(model, "torch")
+                 model: ModelType,
+                 efficient_mode: bool = False) -> None:
+        super().__init__(model, "torch", efficient_mode)
 
     def get_info(self,
                  model: ModelType
@@ -141,12 +152,14 @@ class ALModelTorch(ALModelBase):
                             noise: List[TensorVariableType],
                             apply_noise_fn: Callable,
                             target_vector: TensorType,
-                            loss: LossType
+                            loss: LossType,
+                            preprocess_fn: Optional[Callable] = None
                             ) -> Tuple[TensorType, TensorType]:
         raise NotImplementedError()
 
     def predict(self,
-                x: TensorType | np.ndarray
+                x: TensorType | np.ndarray,
+                preprocess_fn: Optional[Callable] = None
                 ) -> TensorType:
         raise NotImplementedError()
 
@@ -158,8 +171,9 @@ class ALModelTorch(ALModelBase):
 
 class ALModelTF(ALModelBase):
     def __init__(self,
-                 model: ModelType) -> None:
-        super().__init__(model=model, framework="tf")
+                 model: ModelType,
+                 efficient_mode: bool = False,) -> None:
+        super().__init__(model=model, framework="tf", efficient_mode=efficient_mode)
         self.act = getattr(self.model.layers[-1], "activation", None)
         self.model.layers[-1].activation = None
         self.tensor_ops = TensorOps(framework="tf")
@@ -228,13 +242,20 @@ class ALModelTF(ALModelBase):
         noise: List[TensorVariableType],
         construct_perturbation_fn: Callable,
         target_vector: TensorType,
-        loss: Loss
+        loss: Loss,
+        preprocess_fn: Optional[Callable] = None
     ) -> Tuple[TensorType, TensorType]:
         with tf.GradientTape(persistent=True) as tape:
             for n in noise:
                 tape.watch(n)
+
             perturbation = construct_perturbation_fn(noise)
-            input = sample + perturbation
+
+            if preprocess_fn is not None:
+                input = preprocess_fn(sample + perturbation)
+            else:
+                input = sample + perturbation
+                
             logits = self.model(input)
             preds = self.act(logits)
             loss_value = loss.calculate(
@@ -247,9 +268,14 @@ class ALModelTF(ALModelBase):
         return grad_wrt_loss, logit_grads
 
     def predict(self,
-                x: TensorType | np.ndarray
+                x: TensorType | np.ndarray,
+                preprocess_fn: Optional[Callable] = None
                 ) -> TensorType:
-        return self.act(self.model(x, training=False))
+        if preprocess_fn is not None:
+            sample = preprocess_fn(x)
+        else:
+            sample = x
+        return self.act(self.model(sample, training=False))
 
     def forward(self,
                 x: TensorType | np.ndarray
@@ -261,6 +287,7 @@ class ALModel(ALModelBase, metaclass=ALModelMeta):
     def __init__(self,
                  model: ModelType,
                  framework: str,
+                 efficient_mode: bool = False,
                  *args,
                  **kwargs
                  ) -> None:

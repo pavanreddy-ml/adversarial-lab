@@ -122,31 +122,41 @@ def test_tf_model_predict_forward():
     assert fwd.shape == (1, 2)
 
 @pytest.mark.skipif(tf is None, reason="TensorFlow not installed.")
-def test_tf_model_calculate_gradients():
+def test_tf_model_compute_jacobian_flag():
     model = models.Sequential([
         layers.Dense(10, input_shape=(10,)),
         layers.Dense(5, activation="relu"),
         layers.Dense(2)
     ])
 
-    al_model = ALModelTF(model)
+    sample = tf.random.normal((1, 10))
+    noise_meta = [tf.Variable(tf.random.normal((1, 10)))]
 
-    class DummyLoss:
+    def construct_perturbation_fn(noise_meta):
+        return sample + noise_meta[0]
+
+    target_vector = tf.random.normal((1, 2))
+
+    class TestLoss(Loss):
         def calculate(self, target, predictions, logits, noise):
             return tf.reduce_mean((target - predictions) ** 2)
 
-    def dummy_noise_fn(sample):
-        return sample + 0.1 * tf.random.normal(tf.shape(sample))
+    loss = TestLoss()
 
-    sample = tf.random.normal((1, 10))
-    noise = [tf.Variable(tf.random.normal((1, 10))) for _ in range(2)]
-    target_vector = tf.random.normal((1, 2))
-    loss = DummyLoss()
-
-    grad_loss, grad_logits = al_model.calculate_gradients(sample, noise, dummy_noise_fn, target_vector, loss)
-
+    # With compute_jacobian = True
+    al_model = ALModelTF(model)
+    al_model.set_compute_jacobian(True)
+    grad_loss, grad_logits = al_model.calculate_gradients(sample, noise_meta, construct_perturbation_fn, target_vector, loss)
     assert grad_loss is not None
     assert grad_logits is not None
+
+    # With compute_jacobian = False
+    al_model = ALModelTF(model)
+    al_model.set_compute_jacobian(False)
+    grad_loss, grad_logits = al_model.calculate_gradients(sample, noise_meta, construct_perturbation_fn, target_vector, loss)
+    assert grad_loss is not None
+    assert grad_logits is None
+
 
 @pytest.mark.skipif(torch is None, reason="Torch not installed.")
 def test_torch_model_calculate_gradients():

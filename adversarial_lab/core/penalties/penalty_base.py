@@ -40,6 +40,33 @@ class Penalty(ABC):
 
             self.value = None
 
+    def has_param(self, param_name: str) -> bool:
+        """
+        Check if the penalty instance has the given parameter.
+
+        Args:
+            param_name (str): The name of the parameter to check.
+
+        Returns:
+            bool: True if the parameter exists, False otherwise.
+        """
+        return hasattr(self, param_name)
+
+    def update_param(self, param_name: str, value) -> None:
+        """
+        Update the value of a parameter in the penalty instance.
+
+        Args:
+            param_name (str): The name of the parameter to update.
+            value: The new value to set.
+
+        Raises:
+            ValueError: If the parameter does not exist.
+        """
+        if not hasattr(self, param_name):
+            raise ValueError(f"Unknown parameter: {param_name}")
+        setattr(self, param_name, value)
+
     def set_framework(self, 
                       framework: Literal["tf", "torch"]
                       ) -> None:

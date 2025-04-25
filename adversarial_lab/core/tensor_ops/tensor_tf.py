@@ -78,6 +78,26 @@ class TensorOpsTF:
     def norm(tensor: TensorType, p: float) -> TensorType:
         """Compute the Lp norm of the tensor."""
         return tf.reduce_sum(tf.abs(tensor) ** p) ** (1.0 / p)
+    
+    @staticmethod
+    def sub(tensor_a: TensorType, tensor_b: TensorType) -> TensorType:
+        """Subtract two tensors."""
+        return tf.subtract(tensor_a, tensor_b)
+    
+    @staticmethod
+    def add(tensor_a: TensorType, tensor_b: TensorType) -> TensorType:
+        """Add two tensors."""
+        return tf.add(tensor_a, tensor_b)
+    
+    @staticmethod
+    def min(tensor: TensorType, axis: Any | None = None, keepdims: bool = False) -> TensorType:
+        """Compute the minimum value in the tensor."""
+        return tf.reduce_min(input_tensor=tensor, axis=axis, keepdims=keepdims)
+    
+    @staticmethod
+    def max(tensor: TensorType, axis: Any | None = None, keepdims: bool = False) -> TensorType:
+        """Compute the maximum value in the tensor."""
+        return tf.reduce_max(input_tensor=tensor, axis=axis, keepdims=keepdims)
 
     @staticmethod
     def clip(tensor: TensorVariableType, min_val: float, max_val: float) -> TensorType:
@@ -105,11 +125,6 @@ class TensorOpsTF:
         return tf.reduce_sum(input_tensor=tensor, axis=axis, keepdims=keepdims, name=name)
     
     @staticmethod
-    def random_normal(shape: List[int]) -> TensorType:
-        """Generate a tensor with random normal values."""
-        return tf.random.normal(shape)
-    
-    @staticmethod
     def reduce_all(tensor: TensorType) -> bool:
         """Check if all elements in the tensor are True."""
         return tf.reduce_all(tensor)
@@ -120,9 +135,24 @@ class TensorOpsTF:
         return tf.random.uniform(shape, minval=minval, maxval=maxval)
     
     @staticmethod
+    def random_normal(shape: List[int]) -> TensorType:
+        """Generate a tensor with random normal values."""
+        return tf.random.normal(shape)
+    
+    @staticmethod
     def relu(tensor: TensorType) -> TensorType:
         """Compute the ReLU activation function."""
         return tf.nn.relu(tensor)
+    
+    @staticmethod
+    def tensordot(a: TensorType, b: TensorType, axes: Union[int, List[int]]) -> TensorType:
+        """Compute the tensor dot product."""
+        return tf.tensordot(a, b, axes=axes)
+    
+    @staticmethod
+    def reshape(tensor: TensorType, shape: List[int]) -> TensorType:
+        """Reshape the tensor to the specified shape."""
+        return tf.reshape(tensor, shape)
     
 
 
@@ -230,9 +260,26 @@ class TFOptimizers:
         return PGDOptimizer(learning_rate=learning_rate, projection_fn=projection_fn)
     
     @staticmethod
-    def apply(optimizer: OptimizerType,
+    def apply(optimizer: tf.keras.optimizers.Optimizer,
               variable_tensor: List[TensorVariableType],
               gradients: List[TensorType]) -> None:
         """Apply gradients to update model weights."""
         optimizer.apply_gradients(zip(gradients, variable_tensor))
-        
+    
+    @staticmethod
+    def has_param(optimizer: tf.keras.optimizers.Optimizer, 
+                  param_name: str
+                  ) -> bool:
+        return param_name in optimizer._hyper or hasattr(optimizer, param_name)
+
+    @staticmethod
+    def update_param(optimizer: tf.keras.optimizers.Optimizer, 
+                     param_name: str, 
+                     value
+                     ) -> None:
+        if param_name in optimizer._hyper:
+            optimizer._hyper[param_name] = value
+        elif hasattr(optimizer, param_name):
+            setattr(optimizer, param_name, value)
+        else:
+            raise ValueError(f"Parameter '{param_name}' not found in optimizer.")

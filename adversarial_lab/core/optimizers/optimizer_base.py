@@ -44,6 +44,35 @@ class Optimizer(ABC):
         if self.optimizer is None:
             self.initialize_optimizer()
         self.tensor_ops.optimizers.apply(self.optimizer, weights, gradients)
+
+    def has_param(self, param_name: str) -> bool:
+        """
+        Check if the optimizer has the given parameter.
+
+        Parameters:
+            param_name (str): The name of the parameter to check.
+
+        Returns:
+            bool: True if the parameter exists, False otherwise.
+        """
+        if not self.optimizer:
+            raise ValueError("Optimizer has not been initialized.")
+        return self.tensor_ops.optimizers.has_param(self.optimizer, param_name)
+
+    def update_param(self, param_name: str, value) -> None:
+        """
+        Update the value of a parameter in the optimizer.
+
+        Parameters:
+            param_name (str): The name of the parameter to update.
+            value: The new value to set.
+
+        Raises:
+            ValueError: If the parameter does not exist.
+        """
+        if not self.optimizer:
+            raise ValueError("Optimizer has not been initialized.")
+        self.tensor_ops.optimizers.update_param(self.optimizer, param_name, value)
         
     def set_framework(self, 
                       framework: Literal["tf", "torch"]

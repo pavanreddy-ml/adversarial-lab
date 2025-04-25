@@ -41,6 +41,8 @@ class NoiseGenerator(ABC):
                         optimizer: OptimizerType | Optimizer,
                         grads: TensorType,
                         jacobian: TensorType = None,
+                        *args, 
+                        **kwargs
                         ) -> None:
         optimizer.apply(weights=noise_meta, gradients=grads)
 

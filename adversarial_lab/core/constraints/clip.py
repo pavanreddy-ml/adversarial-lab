@@ -34,6 +34,8 @@ class POClip(PostOptimizationConstraint):
 
     def apply(self, 
               noise: TensorVariableType, 
+              *args,
+              **kwargs
               ) -> None:
         clipped_value = self.tensor_ops.clip(noise, self.min, self.max)
         self.tensor_ops.assign(noise, clipped_value)

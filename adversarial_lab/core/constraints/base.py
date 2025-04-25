@@ -16,6 +16,8 @@ class PostOptimizationConstraint(ABC):
     @abstractmethod
     def apply(self, 
               noise: TensorVariableType, 
+              *args,
+              **kwargs
               ) -> None:
         """
         Apply the constraint to the noise inplace.

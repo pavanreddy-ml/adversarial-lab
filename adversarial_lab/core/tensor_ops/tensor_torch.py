@@ -77,6 +77,26 @@ class TensorOpsTorch:
     def norm(tensor: torch.Tensor, p: float) -> torch.Tensor:
         """Compute the Lp norm of the tensor."""
         return torch.norm(tensor, p=p)
+    
+    @staticmethod
+    def sub(tensor_a: torch.Tensor, tensor_b: torch.Tensor) -> torch.Tensor:
+        return torch.sub(tensor_a, tensor_b)
+
+    @staticmethod
+    def add(tensor_a: torch.Tensor, tensor_b: torch.Tensor) -> torch.Tensor:
+        return torch.add(tensor_a, tensor_b)
+
+    @staticmethod
+    def min(tensor: torch.Tensor, axis: Any = None, keepdims: bool = False) -> torch.Tensor:
+        if axis is None:
+            return torch.min(tensor)
+        return torch.min(tensor, dim=axis, keepdim=keepdims).values
+
+    @staticmethod
+    def max(tensor: torch.Tensor, axis: Any = None, keepdims: bool = False) -> torch.Tensor:
+        if axis is None:
+            return torch.max(tensor)
+        return torch.max(tensor, dim=axis, keepdim=keepdims).values
 
     @staticmethod
     def clip(tensor: torch.Tensor, min_val: float, max_val: float) -> torch.Tensor:
@@ -122,6 +142,16 @@ class TensorOpsTorch:
     def relu(tensor: torch.Tensor) -> torch.Tensor:
         """Compute the ReLU activation function."""
         return F.relu(tensor)
+    
+    @staticmethod
+    def tensordot(a: TensorType, b: TensorType, axes: Union[int, List[int]]) -> TensorType:
+        """Compute the tensor dot product."""
+        return torch.tensordot(a, b, dims=axes)
+    
+    @staticmethod
+    def reshape(tensor: TensorType, shape: List[int]) -> TensorType:
+        """Reshape the tensor to the specified shape."""
+        return tensor.view(*shape)
 
 
 class TorchLosses:
@@ -239,3 +269,23 @@ class TorchOptimizers:
 
         optimizer.step()
         optimizer.zero_grad()
+
+    @staticmethod
+    def has_param(optimizer: torch.optim.Optimizer, 
+                  param_name: str
+                  ) -> bool:
+        return any(param_name in group for group in optimizer.param_groups)
+
+
+    @staticmethod
+    def update_param(optimizer: torch.optim.Optimizer, 
+                     param_name: str, 
+                     value
+                     ) -> None:
+        updated = False
+        for group in optimizer.param_groups:
+            if param_name in group:
+                group[param_name] = value
+                updated = True
+        if not updated:
+            raise ValueError(f"Parameter '{param_name}' not found in optimizer.")

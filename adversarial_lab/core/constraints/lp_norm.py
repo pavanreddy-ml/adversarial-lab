@@ -31,7 +31,9 @@ class POLpNorm(PostOptimizationConstraint):
         self.max_iter = max_iter
     
     def apply(self, 
-              noise: TensorVariableType
+              noise: TensorVariableType, 
+              *args,
+              **kwargs
               ) -> None:
         def compute_lp_norm(tensor, p):
             return self.tensor_ops.reduce_sum(self.tensor_ops.abs(tensor) ** p) ** (1.0 / p)

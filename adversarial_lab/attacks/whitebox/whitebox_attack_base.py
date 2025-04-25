@@ -5,6 +5,7 @@ import numpy as np
 from tqdm import tqdm
 from copy import deepcopy
 
+from adversarial_lab.callbacks import *
 from adversarial_lab.core import ALModel
 from adversarial_lab.core.tensor_ops import TensorOps
 from adversarial_lab.analytics import AdversarialAnalytics
@@ -30,6 +31,8 @@ class WhiteBoxAttack(ABC):
                  preprocessing: Optional[Preprocessing] = None,
                  constraints: Optional[List[PostOptimizationConstraint]] = None,
                  analytics: Optional[AdversarialAnalytics] = None,
+                 callbacks: Optional[List[Callback]] = None,
+                 efficient_mode: bool = False,
                  verbose: int = 1,
                  *args,
                  **kwargs
@@ -72,7 +75,11 @@ class WhiteBoxAttack(ABC):
                 This is set by `noise_generator` and defaults to `False`. 
                 To enable, set `requires_jacobian=True` whilie initializing noise generator.
         """
-        self.model = model if isinstance(model, ALModel) else ALModel(model)
+        if isinstance(model, ALModel):
+            self.model = model
+            self.model.efficient_mode = efficient_mode
+        else:
+            self.model = ALModel(model, efficient_mode=efficient_mode)
         self.framework: str = self.model.framework
 
         self._optimizer_arg = optimizer
@@ -81,6 +88,7 @@ class WhiteBoxAttack(ABC):
         self._initialize_noise_generator(noise_generator)
         self._initialize_preprocessing(preprocessing)
         self._initialize_constraints(constraints)
+        self._initialize_callbacks(callbacks)
         self._initialize_analytics(analytics)
 
         self.tensor_ops = TensorOps(framework=self.framework)
@@ -88,6 +96,8 @@ class WhiteBoxAttack(ABC):
         self.verbose = verbose
 
         self.progress_bar = None
+
+
 
     def attack(self,
                epochs: int,
@@ -300,7 +310,40 @@ class WhiteBoxAttack(ABC):
             "post_train": self.analytics.update_post_attack_values
         }
 
-    def _apply_constrains(self, noise):
+    def _initialize_callbacks(self, callbacks: List[Callback]):
+        """
+        Initialize the callbacks for the attack. If no callbacks are provided, an empty list is used by default.
+        
+        """
+
+        if callbacks is None:
+            callbacks = []
+
+        if not isinstance(callbacks, list):
+            raise TypeError("callbacks must be a list of Callback instances.")
+
+        for callback in callbacks:
+            if not isinstance(callback, Callback):
+                raise TypeError(
+                    f"Invalid type for callback: '{type(callback)}'. Must be an instance of Callback.")
+            
+            if isinstance(callback, ChangeParams):
+                for key in callback.params.get("optimizer", {}).keys():
+                    if not self.optimizer.has_param(key):
+                        raise ValueError(f"Optimizer does not have parameter '{key}' to change. Update ChangeParams to use a valid parameter.")
+                    
+                for key in callback.params.get("loss", {}).keys():
+                    if not self.loss.has_param(key):
+                        raise ValueError(f"Loss does not have parameter '{key}' to change. Update ChangeParams to use a valid parameter.")
+
+                for i, penalty in enumerate(callback.params.get("penalties", [])):
+                    for key in penalty.keys():
+                        if not self.loss.penalties[i].has_param(key):
+                            raise ValueError(f"Penalty {repr(penalty)} does not have parameter '{key}' to change. Update ChangeParams to use a valid parameter.")
+    
+        self.callbacks = callbacks
+
+    def _apply_constrains(self, noise, sample):
         """
         Apply all constraints to the noise tensor.
 
@@ -312,7 +355,7 @@ class WhiteBoxAttack(ABC):
         """
         for constraint in self.constraints:
             for n in noise:
-                constraint.apply(n)
+                constraint.apply(noise=n, sample=sample)
 
     def _update_analytics(self,
                           when: Literal["pre_train", "post_batch", "post_epoch", "post_train"],
@@ -321,13 +364,14 @@ class WhiteBoxAttack(ABC):
                           preprocessed_image=None,
                           noise_preprocessed_image=None,
                           predictions=None,
+                          write_only=False,
                           *args,
                           **kwargs):
         if when not in ["pre_train", "post_batch", "post_epoch", "post_train"]:
             raise ValueError(
                 "Invalid value for 'when'. Must be one of ['pre_train', 'post_batch', 'post_epoch', 'post_train'].")
 
-        if when in ["post_epoch", "post_batch"]:
+        if when in ["post_epoch", "post_batch"] or write_only:
             epoch = kwargs.get("epoch", None)
             if epoch is None:
                 raise ValueError(
@@ -336,6 +380,10 @@ class WhiteBoxAttack(ABC):
             epoch = 0
         elif when == "post_train":
             epoch = 99999999
+
+        if write_only:
+            self.analytics.write(epoch_num=epoch)
+            return
 
         analytics_func = self.analytics_function_map[when]
 
@@ -352,14 +400,15 @@ class WhiteBoxAttack(ABC):
         if when != "post_batch":
             self.analytics.write(epoch_num=epoch)
 
-    def _update_progress_bar(self, preprocessed_sample, noise_meta, true_class, target_class):
-        predictions = self.tensor_ops.remove_batch_dim(self.model.predict(preprocessed_sample + self.noise_generator.construct_perturbation(noise_meta)))
-        
+    def _update_progress_bar(self, 
+                             predictions: np.ndarray, 
+                             true_class: int, 
+                             target_class: int):
         predicted_class = np.argmax(predictions)
-        predicted_class_confidence = predictions[predicted_class].numpy()
+        predicted_class_confidence = predictions[predicted_class]
 
-        true_class_confidence = predictions[true_class].numpy()
-        target_class_confidence = predictions[target_class].numpy()
+        true_class_confidence = predictions[true_class]
+        target_class_confidence = predictions[target_class]
 
         loss = self.loss.get_total_loss()
         
@@ -378,4 +427,32 @@ class WhiteBoxAttack(ABC):
                     'Original Class (score)': f"{true_class}({true_class_confidence:.3f})",
                     'Target Class (score)': f"{target_class}({target_class_confidence:.3f})",
                 })
+            
+    def _apply_callbacks(self, 
+                         predictions,
+                         true_class,
+                         target_class,
+                         when: Literal["post_epoch"] = "post_epoch"):
+        callback_list = {}
+
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+
+            call_back_results = callback.on_epoch_end(
+                predictions=predictions,
+                true_class=true_class,
+                target_class=target_class,
+                loss=self.loss,
+            )
+
+            if call_back_results is not None:
+                if isinstance(callback, ChangeParams):
+                    callback.apply_changes(optimizer=self.optimizer, loss=self.loss)
+                else:
+                    callback_list.update(call_back_results)
+
+                if callback.blocking: break
+                
+        return callback_list
 
