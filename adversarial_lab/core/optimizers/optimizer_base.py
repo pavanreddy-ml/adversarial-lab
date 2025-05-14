@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Literal, List
+from typing import Literal, List, Callable
 
 from adversarial_lab.core.tensor_ops import TensorOps
 from adversarial_lab.core.types import TensorType, TensorVariableType
@@ -27,9 +27,11 @@ class Optimizer(ABC):
         """
         pass
 
-    def apply(self,
+    def update(self,
               weights: List[TensorVariableType],
-              gradients: List[TensorType]) -> None:
+              gradients: List[TensorType],
+              predict_fn: Callable = None
+              ) -> None:
         """
         Apply gradients to update model weights.
         
@@ -75,7 +77,7 @@ class Optimizer(ABC):
         self.tensor_ops.optimizers.update_param(self.optimizer, param_name, value)
         
     def set_framework(self, 
-                      framework: Literal["tf", "torch"]
+                      framework: Literal["tf", "torch", "numpy"]
                       ) -> None:
         """
         Set the computational framework for the optimizer.
@@ -90,8 +92,8 @@ class Optimizer(ABC):
             - This method initializes `TensorOps` for the specified framework.
             - The optimizer is reinitialized to align with the new framework.
         """
-        if framework not in ["tf", "torch"]:
-            raise ValueError("framework must be either 'tf' or 'torch'")
+        if framework not in ["tf", "torch", "numpy"]:
+            raise ValueError("framework must be either 'tf', 'torch' or 'numpy'")
         self.framework = framework
         self.tensor_ops = TensorOps(framework)
         self.initialize_optimizer()

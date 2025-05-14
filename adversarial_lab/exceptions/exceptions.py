@@ -66,3 +66,39 @@ class IndifferentiabilityError(Exception):
         if self.details:
             return f"{self.message}\nDetails: {self.details}"
         return self.message
+    
+
+class QueriesExhaustedError(Exception):
+    def __init__(self, 
+                 message: str = "", 
+                 details: str = None):
+        self.message = f"""
+        The queries have been exhausted: {message}.
+
+        The number of queries has been exhausted. This typically occurs when the number of queries
+        exceeds the maximum number of queries allowed. The attack will stop and return the best
+        result so far. 
+        """
+        self.details = details
+        super().__init__(self.message)
+
+    def __str__(self):
+        if self.details:
+            return f"{self.message}\nDetails: {self.details}"
+        return self.message
+    
+
+class InvalidPredictionError(Exception):
+    def __init__(self, 
+                 message: str = "", 
+                 details: str = None):
+        self.message = f"""
+        The prediction type/format of the model/function is Invalid: {message}.
+        """
+        self.details = details
+        super().__init__(self.message)
+
+    def __str__(self):
+        if self.details:
+            return f"{self.message}\nDetails: {self.details}"
+        return self.message

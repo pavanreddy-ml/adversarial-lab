@@ -49,13 +49,13 @@ class AdditiveNoiseGenerator(NoiseGenerator):
 
         noise_meta = self.tensor_ops.variable(noise_meta)
 
-        noise_meta.assign(noise_meta * self._mask)
+        self.tensor_ops.assign(noise_meta, noise_meta * self._mask)
         return [noise_meta]
 
     def get_noise(self,
                   noise_meta: List[TensorVariableType]
                   ) -> np.ndarray:
-        return noise_meta[0].numpy()
+        return self.tensor_ops.numpy(noise_meta[0])
 
     def construct_perturbation(self,
                     noise_meta: List[TensorVariableType]

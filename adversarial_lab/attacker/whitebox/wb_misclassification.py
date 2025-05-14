@@ -9,10 +9,10 @@ from adversarial_lab.core.losses import Loss
 from adversarial_lab.callbacks import Callback
 from adversarial_lab.core.optimizers import Optimizer
 from adversarial_lab.analytics import AdversarialAnalytics
-from adversarial_lab.exceptions import VectorDimensionsError
 from adversarial_lab.core.preprocessing import Preprocessing
 from adversarial_lab.core.noise_generators import NoiseGenerator
 from adversarial_lab.core.constraints import PostOptimizationConstraint
+from adversarial_lab.exceptions import VectorDimensionsError, IncompatibilityError
 
 from typing import Optional, Union, Literal, List
 from adversarial_lab.core.types import TensorType, ModelType
@@ -36,7 +36,8 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                  analytics: Optional[AdversarialAnalytics] = None,
                  callbacks: Optional[List[Callback]] = None,
                  verbose: int = 1,
-                 efficient_mode: bool = False,
+                 efficient_mode: Optional[int] = None,
+                 efficient_mode_indexes: Optional[List[int]] = None,
                  *args,
                  **kwargs) -> None:
         super().__init__(model=model,
@@ -49,6 +50,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                          callbacks=callbacks,
                          verbose=verbose,
                          efficient_mode=efficient_mode,
+                         efficient_mode_indexes=efficient_mode_indexes,
                          *args,
                          **kwargs)
 
@@ -64,10 +66,20 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                *args,
                **kwargs
                ) -> np.ndarray:
+        if self.model._compute_jacobian and self.model.efficient_mode is None:
+            warnings.warn(
+                "The model is set to compute jacobian, but efficient mode is not enabled. "
+                "This may lead to high memory usage and slow performance. Consider enabling efficient mode. "
+                "Efficient mode computes logit gradients only for the required indexes, rather than "
+                "the entire jacobian matrix. This can significantly reduce memory usage and speed up the attack. "
+                "Ignore this warning if you require the full jacobian matrix. "
+            )
+
         super().attack(epochs, *args, **kwargs)
         addn_analytics_fields = addn_analytics_fields or {}
 
-        preprocessed_sample = self.tensor_ops.remove_batch_dim(self.preprocessing.preprocess(sample))
+        preprocessed_sample = self.tensor_ops.remove_batch_dim(
+            self.preprocessing.preprocess(sample))
 
         sample_to_attack, predictions, noise_meta, target_vector = self._initialize_attack(
             sample=sample,
@@ -78,24 +90,25 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             on_original=on_original
         )
 
-        true_class = np.argmax(self.tensor_ops.remove_batch_dim(predictions).numpy())
-        target_class = np.argmax(self.tensor_ops.remove_batch_dim(target_vector).numpy())
+        true_class = np.argmax(
+            self.tensor_ops.remove_batch_dim(predictions).numpy())
+        target_class = np.argmax(
+            self.tensor_ops.remove_batch_dim(target_vector).numpy())
 
         # Initial stats
         self._update_analytics(
             when="pre_train",
             loss=self.loss,
             original_sample=sample,
-            preprocessed_sample=preprocessed_sample,
+            preprocessed_sample=self.tensor_ops.numpy(preprocessed_sample),
             noise=self.noise_generator.get_noise(noise_meta),
-            predictions=self.tensor_ops.remove_batch_dim(predictions).numpy(),
+            predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(predictions)),
             on_original=on_original,
             **addn_analytics_fields
         )
 
-
         for epoch in range(epochs):
-            grads, jacobian = self.model.calculate_gradients(
+            grads, jacobian, logits, preds = self.model.calculate_gradients(
                 sample=sample_to_attack,
                 noise=noise_meta,
                 construct_perturbation_fn=self.noise_generator.construct_perturbation,
@@ -103,25 +116,29 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                 loss=self.loss,
                 preprocess_fn=self.preprocessing.preprocess if on_original else None)
 
-            self.noise_generator.apply_gradients(
+            self.noise_generator.update(
                 noise_meta=noise_meta,
                 optimizer=self.optimizer,
                 grads=grads,
                 jacobian=jacobian,
-                predictions=predictions,
-                target_vector=target_vector
+                logits=logits,
+                predictions=preds,
+                target_vector=target_vector,
+                true_class=true_class
             )
 
             self._apply_constrains(noise_meta, sample_to_attack)
 
             # Stats
             predictions = self.model.predict(
-                x=sample_to_attack + self.noise_generator.construct_perturbation(noise_meta),
+                x=sample_to_attack +
+                self.noise_generator.construct_perturbation(noise_meta),
                 preprocess_fn=self.preprocessing.preprocess if on_original else None
             )
-            
+
             self._update_progress_bar(
-                predictions=self.tensor_ops.remove_batch_dim(predictions).numpy(),
+                predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(
+                    predictions)),
                 true_class=true_class,
                 target_class=target_class,
             )
@@ -133,13 +150,15 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                 original_sample=sample,
                 preprocessed_sample=preprocessed_sample,
                 noise=self.noise_generator.get_noise(noise_meta),
-                predictions=self.tensor_ops.remove_batch_dim(predictions).numpy(),
+                predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(
+                    predictions)),
                 on_original=on_original,
                 **addn_analytics_fields
             )
 
             callbacks_data = self._apply_callbacks(
-                predictions=self.tensor_ops.remove_batch_dim(predictions).numpy(),
+                predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(
+                    predictions)),
                 true_class=true_class,
                 target_class=target_class,
             )
@@ -153,7 +172,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             original_sample=sample,
             preprocessed_sample=preprocessed_sample,
             noise=self.noise_generator.get_noise(noise_meta),
-            predictions=self.tensor_ops.remove_batch_dim(predictions).numpy(),
+            predictions=self.tensor_ops.numpy(self.tensor_ops.remove_batch_dim(predictions)),
             on_original=on_original,
             **addn_analytics_fields
         )
@@ -168,29 +187,28 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                                              'uniform', 'random'] = "random",
                            binary_threshold: float = 0.5,
                            on_original=False) -> None:
-        # Future Versions must handle both pre and post preprocessing noise. The preprocessing function must be differentiable
-        # In order for pre preprocessing noise.
         sample = self.tensor_ops.tensor(sample)
         preprocessed_sample = self.preprocessing.preprocess(sample)
         sample_to_attack = sample if on_original else preprocessed_sample
 
         if not self.tensor_ops.has_batch_dim(preprocessed_sample):
             warnings.warn("The sample after preprocessing does not have a batch dimension. "
-            "Adding a batch dimension must be handles in the preprocessing function."
-            "If sample does not requrie a batch dimension, ignore this warning.")
+                          "Adding a batch dimension must be handled in the preprocessing function."
+                          "If sample does not requrie a batch dimension, ignore this warning.")
 
         noise_meta = self.noise_generator.generate_noise_meta(
             sample_to_attack)
-        
+
         predictions = self.model.predict(
-            x=sample_to_attack + self.noise_generator.construct_perturbation(noise_meta),
+            x=sample_to_attack +
+            self.noise_generator.construct_perturbation(noise_meta),
             preprocess_fn=self.preprocessing.preprocess if on_original else None
-            )  # Testing if noise can be applied to the preprocessed image
+        )  # Testing if noise can be applied to the preprocessed image
         predictions = predictions = self.model.predict(
             x=sample_to_attack,
             preprocess_fn=self.preprocessing.preprocess if on_original else None
-            )
-        
+        )
+
         if self.tensor_ops.has_batch_dim(predictions):
             has_batch_dim = True
         else:
@@ -230,8 +248,8 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             target_vector = self._get_target_vector(
                 predictions, true_class, strategy)
 
-
-        target_vector = self.tensor_ops.add_batch_dim(target_vector) if has_batch_dim else self.tensor_ops.remove_batch_dim(target_vector)
+        target_vector = self.tensor_ops.add_batch_dim(
+            target_vector) if has_batch_dim else self.tensor_ops.remove_batch_dim(target_vector)
 
         return sample_to_attack, predictions, noise_meta, target_vector
 
@@ -240,10 +258,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
                            true_class: int,
                            strategy: Literal['spread', 'uniform', 'random']
                            ) -> Union[np.ndarray, TensorType]:
-        if self.tensor_ops.has_batch_dim(predictions):
-            num_classes = predictions.shape[0]
-        else:
-            num_classes = predictions.shape[1]
+        num_classes = predictions.shape[1]
 
         if strategy == 'spread':
             target_vector = np.ones(num_classes) / (num_classes - 1)
@@ -258,6 +273,7 @@ class WhiteBoxMisclassification(WhiteBoxAttack):
             target_vector[random_class] = 1
 
         target_vector = self.tensor_ops.tensor(target_vector)
+        target_vector = self.tensor_ops.add_batch_dim(target_vector)
 
         if predictions.shape != target_vector.shape:
             raise VectorDimensionsError(

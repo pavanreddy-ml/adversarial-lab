@@ -1,15 +1,17 @@
 from abc import ABC, abstractmethod, ABCMeta
-from typing import Literal, Union, List, Tuple
+
 import numpy as np
 
 from adversarial_lab.core.tensor_ops import TensorOps
 from adversarial_lab.core.optimizers import Optimizer
+
+from typing import Literal, Union, List, Tuple, Optional, Callable
 from adversarial_lab.core.types import TensorType, TensorVariableType, OptimizerType
 
 
 class NoiseGenerator(ABC):
     def __init__(self,
-                 mask: np.ndarray = None,
+                 mask: Optional[np.ndarray] = None,
                  requires_jacobian: bool = False) -> None:
         self._mask = mask
         self.requires_jacobian = requires_jacobian
@@ -36,23 +38,30 @@ class NoiseGenerator(ABC):
                                ) -> Union[TensorVariableType, TensorType]:
         pass
 
-    def apply_gradients(self,
-                        noise_meta: TensorVariableType,
-                        optimizer: OptimizerType | Optimizer,
-                        grads: TensorType,
-                        jacobian: TensorType = None,
-                        *args, 
-                        **kwargs
-                        ) -> None:
-        optimizer.apply(weights=noise_meta, gradients=grads)
+    def update(self,
+               noise_meta: TensorVariableType,
+               optimizer: OptimizerType | Optimizer,
+               grads: TensorType,
+               jacobian: TensorType = None,
+               predictions: TensorType = None,
+               target_vector: TensorType = None,
+               true_class: int = None,
+               predict_fn: Callable = None,
+               *args,
+               **kwargs
+               ) -> None:
+        optimizer.update(weights=noise_meta, gradients=grads)
 
     def get_mask(self) -> np.ndarray:
-        return self._mask.numpy() if self._mask is not None else None
+        return self.tensor_ops.numpy(self._mask) if self._mask is not None else None
 
     def set_framework(self,
-                      framework: Literal["tf", "torch"]
+                      framework: Literal["tf", "torch", "numpy"]
                       ) -> None:
-        if framework not in ["tf", "torch"]:
+        if framework not in ["tf", "torch", "numpy"]:
             raise ValueError("framework must be either 'tf' or 'torch'")
         self.framework = framework
         self.tensor_ops = TensorOps(framework)
+
+        self._mask = self.tensor_ops.tensor(
+            self._mask) if self._mask is not None else None

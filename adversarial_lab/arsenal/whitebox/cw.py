@@ -1,12 +1,16 @@
-from .attacks_base import AttacksBase
+from ..attacks_base import AttacksBase
 
-from adversarial_lab.attacks.whitebox import WhiteBoxMisclassification
+from adversarial_lab.attacker.whitebox import WhiteBoxMisclassification
 from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator
 from adversarial_lab.core.losses import CategoricalCrossEntropy
 from adversarial_lab.core.optimizers import Adam
 from adversarial_lab.core.constraints import POClip
 from adversarial_lab.core.losses import Loss
 from adversarial_lab.core.penalties import LpNorm
+
+from adversarial_lab.core.types import ModelType, TensorType
+
+from typing import Callable, Optional, Union, Literal
 
 
 class CWLoss(Loss):
@@ -61,15 +65,23 @@ class CarliniWagnerAttack(AttacksBase):
         )
 
     def attack(self,
-               sample,
-               target_class,
-               target_vector,
-               epochs=10,
+               sample: TensorType,
+               target_class: int = None,
+               target_vector: TensorType = None,
+               strategy: Literal['spread', 'uniform', 'random'] = "random",
+               binary_threshold: float = 0.5,
+               on_original: bool = False,
+               epochs: int = 10,
+               addn_analytics_fields: dict | None = None,
                *args,
                **kwargs):
         return self.attacker.attack(sample=sample,
                                     target_class=target_class,
                                     target_vector=target_vector,
+                                    strategy=strategy,
+                                    binary_threshold=binary_threshold,
                                     epochs=epochs,
+                                    on_original=on_original,
+                                    addn_analytics_fields=addn_analytics_fields,
                                     *args,
                                     **kwargs)

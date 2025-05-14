@@ -21,7 +21,7 @@ def test_loss_invalid_framework():
         def calculate(self, target, predictions, logits, *args, **kwargs):
             pass
     
-    with pytest.raises(ValueError, match="framework must be either 'tf' or 'torch'"):
+    with pytest.raises(ValueError, match="framework must be either 'tf', 'torch' or 'numpy'"):
         loss = DummyLoss()
         loss.set_framework("invalid")
 

@@ -110,3 +110,37 @@ def test_reset_behavior():
     cb.reset()
     assert cb.patience_counter == 0
     assert cb.value_tracker == float('inf')
+
+@pytest.mark.parametrize("preds,true_class,target_class,confidence,expected", [
+    (np.array([0.1, 0.9]), 0, None, None, True),          # misclassified (no target_class, no confidence)
+    (np.array([0.1, 0.9]), 0, None, 0.95, False),         # misclassified, low confidence
+    (np.array([0.1, 0.96]), 0, None, 0.95, True),         # misclassified, high confidence
+    (np.array([0.9, 0.1]), 0, 1, 0.95, False),            # not targeted
+    (np.array([0.1, 0.95]), 0, 1, 0.90, True),            # targeted and confident
+])
+def test_combined_misclassification_logic(preds, true_class, target_class, confidence, expected):
+    cb = EarlyStopping(trigger="misclassification", patience=1, confidence=confidence, target_class=target_class)
+    loss = DummyLoss()
+    loss.set_framework("tf")
+    loss.value = 0.1
+    cb.value_tracker = 0.1
+
+    result = cb.is_triggered(preds, true_class, target_class, loss)
+    assert result == expected
+
+
+def test_reinitialize_restores_state():
+    cb = EarlyStopping(trigger="confidence_reduction", patience=2, confidence=0.5)
+    cb.enabled = False
+    cb.blocking = False
+    cb.trigger_counter = 999
+    cb.patience_counter = 3
+    cb.value_tracker = 123
+
+    cb.reinitialize()
+
+    assert cb.enabled is True
+    assert cb.blocking == cb._original_blocking_state
+    assert cb.trigger_counter == 0
+    assert cb.patience_counter == 0
+    assert cb.value_tracker == float('inf')

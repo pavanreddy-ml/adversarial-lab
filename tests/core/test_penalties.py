@@ -21,7 +21,7 @@ def test_penalty_invalid_framework():
         def calculate(self, noise, *args, **kwargs):
             pass
     
-    with pytest.raises(ValueError, match="framework must be either 'tf' or 'torch'"):
+    with pytest.raises(ValueError, match="framework must be either 'tf', 'torch' or 'numpy'"):
         penalty = DummyPenalty()
         penalty.set_framework("invalid")
 

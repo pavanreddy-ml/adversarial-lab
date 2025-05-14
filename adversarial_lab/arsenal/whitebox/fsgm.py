@@ -1,16 +1,20 @@
-from .attacks_base import AttacksBase
+from ..attacks_base import AttacksBase
 
-from adversarial_lab.attacks.whitebox import WhiteBoxMisclassification
+from adversarial_lab.attacker.whitebox import WhiteBoxMisclassification
 from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator
 from adversarial_lab.core.losses import CategoricalCrossEntropy, BinaryCrossEntropy
 from adversarial_lab.core.optimizers import PGD
 
+from adversarial_lab.core.types import ModelType, TensorType
+
+from typing import Callable, Optional, Union, Literal
+
 
 class FastSignGradientMethodAttack(AttacksBase):
     def __init__(self,
-                 model,
-                 preprocessing_fn,
-                 epsilon=0.1,
+                 model: ModelType,
+                 preprocessing_fn: Callable,
+                 epsilon: float = 0.1,
                  binary=False,
                  *args,
                  **kwargs
@@ -26,14 +30,23 @@ class FastSignGradientMethodAttack(AttacksBase):
         )
 
     def attack(self,
-               sample,
-               target_class,
-               target_vector,
+               sample: TensorType,
+               target_class: int = None,
+               target_vector: TensorType = None,
+               strategy: Literal['spread', 'uniform', 'random'] = "random",
+               binary_threshold: float = 0.5,
+               on_original: bool = False,
+               addn_analytics_fields: dict | None = None,
                *args,
                **kwargs):
+        kwargs.pop("epochs", None)
         return self.attacker.attack(sample=sample,
                                     target_class=target_class,
                                     target_vector=target_vector,
+                                    strategy=strategy,
+                                    binary_threshold=binary_threshold,
                                     epochs=1,
+                                    on_original=on_original,
+                                    addn_analytics_fields=addn_analytics_fields,
                                     *args,
                                     **kwargs)

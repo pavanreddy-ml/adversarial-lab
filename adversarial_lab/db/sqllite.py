@@ -71,5 +71,16 @@ class SqlliteDB:
         self.cursor.execute(query, values)
         self.connection.commit()
 
+    def execute_query(self, 
+                     query: str, 
+                     params: tuple = ()
+                     ) -> list | None:
+        self.cursor.execute(query, params)
+        if self.cursor.description is None:
+            self.connection.commit()
+            return None
+        columns = [desc[0] for desc in self.cursor.description]
+        return [dict(zip(columns, row)) for row in self.cursor.fetchall()]
+
     def close(self) -> None:
         self.connection.close()

@@ -12,7 +12,7 @@ def test_optimizer_instantiation(framework):
         def initialize_optimizer(self):
             self.optimizer = None
         
-        def apply(self, weights, gradients):
+        def update(self, weights, gradients):
             pass
     
     optimizer = DummyOptimizer()
@@ -25,10 +25,10 @@ def test_optimizer_invalid_framework():
         def initialize_optimizer(self):
             self.optimizer = None
         
-        def apply(self, weights, gradients):
+        def update(self, weights, gradients):
             pass
     
-    with pytest.raises(ValueError, match="framework must be either 'tf' or 'torch'"):
+    with pytest.raises(ValueError, match="framework must be either 'tf', 'torch' or 'numpy'"):
         optimizer = DummyOptimizer()
         optimizer.set_framework("invalid_framework")
 
@@ -45,7 +45,7 @@ def test_optimizer_initialization(framework, optimizer_class):
 
 @pytest.mark.parametrize("framework", ["torch", "tf"])
 @pytest.mark.parametrize("optimizer_class", [Adam, SGD, PGD])
-def test_optimizer_apply(framework, optimizer_class):
+def test_optimizer_update(framework, optimizer_class):
     optimizer = optimizer_class()
     optimizer.set_framework(framework)
 
@@ -57,7 +57,7 @@ def test_optimizer_apply(framework, optimizer_class):
         gradients = torch.tensor([0.1, 0.2, 0.3], dtype=torch.float32)
 
     try:
-        optimizer.apply(weights, gradients)
+        optimizer.update(weights, gradients)
     except NotImplementedError:
         pass
 

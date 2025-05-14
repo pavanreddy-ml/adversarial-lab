@@ -16,6 +16,11 @@ class TensorOpsTorch:
         return torch.tensor(arr, dtype=torch.float32)
     
     @staticmethod
+    def numpy(tensor: torch.Tensor) -> np.ndarray:
+        """Convert a PyTorch tensor to a numpy array."""
+        return tensor.detach().cpu().numpy() if tensor.is_cuda else tensor.numpy()
+    
+    @staticmethod
     def constant(value: Union[float, int], dtype: Any) -> torch.Tensor:
         """Create a PyTorch constant."""
         return torch.tensor(value, dtype=dtype)

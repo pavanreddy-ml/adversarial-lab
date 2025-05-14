@@ -10,15 +10,16 @@ from adversarial_lab.core import ALModel
 from adversarial_lab.core.tensor_ops import TensorOps
 from adversarial_lab.analytics import AdversarialAnalytics
 from adversarial_lab.core.losses import Loss, LossRegistry
+from adversarial_lab.core.gradient_estimator import GradientEstimator
 from adversarial_lab.core.constraints import PostOptimizationConstraint
 from adversarial_lab.core.optimizers import Optimizer, OptimizerRegistry
-from adversarial_lab.core.preprocessing import NoPreprocessing, Preprocessing
 from adversarial_lab.core.noise_generators import AdditiveNoiseGenerator, NoiseGenerator
 
 from typing import Union, List, Optional, Literal
+from adversarial_lab.core.types import TensorType
 
 
-class WhiteBoxAttack(ABC):
+class AttackerBase(ABC):
     """
     Base class for white-box adversarial attack. Subclasses must implement specific attack methods.
     """
@@ -28,11 +29,12 @@ class WhiteBoxAttack(ABC):
                  optimizer: Union[str, Optimizer],
                  loss: Optional[Union[str, Loss]] = None,
                  noise_generator: Optional[NoiseGenerator] = None,
-                 preprocessing: Optional[Preprocessing] = None,
                  constraints: Optional[List[PostOptimizationConstraint]] = None,
                  analytics: Optional[AdversarialAnalytics] = None,
                  callbacks: Optional[List[Callback]] = None,
-                 efficient_mode: bool = False,
+                 efficient_mode: Optional[int] = False,
+                 efficient_mode_indexes: Optional[List[int]] = None,
+                 gradient_estimator: Optional[GradientEstimator] = None,
                  verbose: int = 1,
                  *args,
                  **kwargs
@@ -78,15 +80,19 @@ class WhiteBoxAttack(ABC):
         if isinstance(model, ALModel):
             self.model = model
             self.model.efficient_mode = efficient_mode
+            self.model.efficient_mode_indexes = efficient_mode_indexes or []
+            self.model.gradient_estimator = gradient_estimator
         else:
-            self.model = ALModel(model, efficient_mode=efficient_mode)
+            self.model = ALModel(model,
+                                 efficient_mode=efficient_mode,
+                                 efficient_mode_indexes=efficient_mode_indexes,
+                                 gradient_estimator=gradient_estimator)
         self.framework: str = self.model.framework
 
         self._optimizer_arg = optimizer
         self._initialize_optimizer(self._optimizer_arg)
         self._initialize_loss(loss)
         self._initialize_noise_generator(noise_generator)
-        self._initialize_preprocessing(preprocessing)
         self._initialize_constraints(constraints)
         self._initialize_callbacks(callbacks)
         self._initialize_analytics(analytics)
@@ -95,9 +101,7 @@ class WhiteBoxAttack(ABC):
 
         self.verbose = verbose
 
-        self.progress_bar = None
-
-
+        self.progress_bar: Optional[tqdm] = None
 
     def attack(self,
                epochs: int,
@@ -120,6 +124,7 @@ class WhiteBoxAttack(ABC):
             np.ndarray: The adversarial noise generated during the attack.
         """
         self._initialize_optimizer(self._optimizer_arg)
+        self._reset_callbacks()
 
         if "ipykernel" in sys.modules or "google.colab" in sys.modules:
             from IPython.display import clear_output
@@ -225,29 +230,6 @@ class WhiteBoxAttack(ABC):
         self.noise_generator.set_framework(self.framework)
         self.model.set_compute_jacobian(self.noise_generator.requires_jacobian)
 
-    def _initialize_preprocessing(self, preprocessing):
-        """
-        Initializes the preprocessing pipeline for the attack. If no preprocessing is provided,
-        `NoPreprocessing` is used by default.
-
-        Parameters:
-        ----------
-        preprocessing : Preprocessing, optional
-            The preprocessing pipeline to apply before generating adversarial noise.
-
-        Raises:
-        -------
-        TypeError
-            If the preprocessing argument is not an instance of `Preprocessing`.
-        """
-        if preprocessing is None:
-            self.preprocessing = NoPreprocessing()
-        elif isinstance(preprocessing, Preprocessing):
-            self.preprocessing = preprocessing
-        else:
-            raise TypeError(
-                f"Invalid type for preprocessing: '{type(preprocessing)}'")
-
     def _initialize_constraints(self,
                                 constraints: List[PostOptimizationConstraint]):
         """
@@ -313,7 +295,7 @@ class WhiteBoxAttack(ABC):
     def _initialize_callbacks(self, callbacks: List[Callback]):
         """
         Initialize the callbacks for the attack. If no callbacks are provided, an empty list is used by default.
-        
+
         """
 
         if callbacks is None:
@@ -326,22 +308,32 @@ class WhiteBoxAttack(ABC):
             if not isinstance(callback, Callback):
                 raise TypeError(
                     f"Invalid type for callback: '{type(callback)}'. Must be an instance of Callback.")
-            
+
             if isinstance(callback, ChangeParams):
                 for key in callback.params.get("optimizer", {}).keys():
                     if not self.optimizer.has_param(key):
-                        raise ValueError(f"Optimizer does not have parameter '{key}' to change. Update ChangeParams to use a valid parameter.")
-                    
+                        raise ValueError(
+                            f"Optimizer does not have parameter '{key}' to change. Update ChangeParams to use a valid parameter.")
+
                 for key in callback.params.get("loss", {}).keys():
                     if not self.loss.has_param(key):
-                        raise ValueError(f"Loss does not have parameter '{key}' to change. Update ChangeParams to use a valid parameter.")
+                        raise ValueError(
+                            f"Loss does not have parameter '{key}' to change. Update ChangeParams to use a valid parameter.")
 
                 for i, penalty in enumerate(callback.params.get("penalties", [])):
                     for key in penalty.keys():
                         if not self.loss.penalties[i].has_param(key):
-                            raise ValueError(f"Penalty {repr(penalty)} does not have parameter '{key}' to change. Update ChangeParams to use a valid parameter.")
-    
+                            raise ValueError(
+                                f"Penalty {repr(penalty)} does not have parameter '{key}' to change. Update ChangeParams to use a valid parameter.")
+
         self.callbacks = callbacks
+
+    def _reset_callbacks(self):
+        """
+        Reset the state of all callbacks.
+        """
+        for callback in self.callbacks:
+            callback.reinitialize()
 
     def _apply_constrains(self, noise, sample):
         """
@@ -360,9 +352,9 @@ class WhiteBoxAttack(ABC):
     def _update_analytics(self,
                           when: Literal["pre_train", "post_batch", "post_epoch", "post_train"],
                           loss=None,
-                          raw_image=None,
-                          preprocessed_image=None,
-                          noise_preprocessed_image=None,
+                          original_sample=None,
+                          preprocessed_sample=None,
+                          noise_preprocessed_sample=None,
                           predictions=None,
                           write_only=False,
                           *args,
@@ -389,9 +381,9 @@ class WhiteBoxAttack(ABC):
 
         analytics_func(
             loss=loss,
-            raw_image=raw_image,
-            preprocessed_image=preprocessed_image,
-            noise_preprocessed_image=noise_preprocessed_image,
+            original_sample=original_sample,
+            preprocessed_sample=preprocessed_sample,
+            noise_preprocessed_sample=noise_preprocessed_sample,
             predictions=predictions,
             *args,
             **kwargs
@@ -400,9 +392,9 @@ class WhiteBoxAttack(ABC):
         if when != "post_batch":
             self.analytics.write(epoch_num=epoch)
 
-    def _update_progress_bar(self, 
-                             predictions: np.ndarray, 
-                             true_class: int, 
+    def _update_progress_bar(self,
+                             predictions: np.ndarray,
+                             true_class: int,
                              target_class: int):
         predicted_class = np.argmax(predictions)
         predicted_class_confidence = predictions[predicted_class]
@@ -411,7 +403,7 @@ class WhiteBoxAttack(ABC):
         target_class_confidence = predictions[target_class]
 
         loss = self.loss.get_total_loss()
-        
+
         self.progress_bar.update(1)
         if self.verbose == 2:
             self.progress_bar.set_postfix(
@@ -427,8 +419,8 @@ class WhiteBoxAttack(ABC):
                     'Original Class (score)': f"{true_class}({true_class_confidence:.3f})",
                     'Target Class (score)': f"{target_class}({target_class_confidence:.3f})",
                 })
-            
-    def _apply_callbacks(self, 
+
+    def _apply_callbacks(self,
                          predictions,
                          true_class,
                          target_class,
@@ -448,11 +440,15 @@ class WhiteBoxAttack(ABC):
 
             if call_back_results is not None:
                 if isinstance(callback, ChangeParams):
-                    callback.apply_changes(optimizer=self.optimizer, loss=self.loss)
+                    callback.apply_changes(
+                        optimizer=self.optimizer, loss=self.loss)
                 else:
                     callback_list.update(call_back_results)
 
-                if callback.blocking: break
-                
+                if callback.blocking:
+                    break
+
         return callback_list
 
+    def _is_hard_vector(self, vector: TensorType) -> bool:
+        return np.all(np.logical_or(vector.numpy() == 0, vector.numpy() == 1))

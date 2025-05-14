@@ -44,6 +44,9 @@ class AdversarialAnalytics:
             self.trackers = []
             self.table_name = None
             return
+        
+        if table_name is None:
+            raise ValueError("Table name must be provided.")
 
         if not db.validate_connection():
             raise ConnectionError("Failed to Validate DB Connection")

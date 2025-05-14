@@ -8,7 +8,7 @@ from .noised_sample_bound import PONoisedSampleBounding
 __all__ = [
     "PostOptimizationConstraint",
     "POConstraintFromFunction",
-    "PONoisedSampleBounding"
+    "PONoisedSampleBounding",
     "POClip",
     "POLpNorm",
 ]

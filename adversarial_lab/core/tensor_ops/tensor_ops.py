@@ -45,6 +45,9 @@ class TensorOpsMeta(ABCMeta):
         elif framework == "tf":
             from .tensor_tf import TensorOpsTF
             specific_class = TensorOpsTF
+        elif framework == "numpy":
+            from .tensor_numpy import TensorOpsNumpy
+            specific_class = TensorOpsNumpy
         else:
             raise ValueError(f"Unsupported framework: {framework}")
 

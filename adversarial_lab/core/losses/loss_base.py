@@ -81,6 +81,8 @@ class Loss(ABC):
                 self.value = value.item()
             elif self.framework == "tf":
                 self.value = float(value.numpy())
+            elif self.framework == "numpy":
+                self.value = float(value)
 
         except Exception as e:
             if not self.warned:
@@ -121,7 +123,7 @@ class Loss(ABC):
             raise ValueError(f"Unknown parameter: {param_name}")
         setattr(self, param_name, value)
 
-    def set_framework(self, framework: Literal["tf", "torch"]) -> None:
+    def set_framework(self, framework: Literal["tf", "torch", "numpy"]) -> None:
         """
         Set the framework for the constraint.
 
@@ -134,8 +136,8 @@ class Loss(ABC):
         Note:
             Updates `self.tensor_ops` to match the selected framework.
         """
-        if framework not in ["tf", "torch"]:
-            raise ValueError("framework must be either 'tf' or 'torch'")
+        if framework not in ["tf", "torch", "numpy"]:
+            raise ValueError("framework must be either 'tf', 'torch' or 'numpy'")
         self.framework = framework
         self.tensor_ops = TensorOps(framework)
 

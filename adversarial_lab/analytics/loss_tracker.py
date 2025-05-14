@@ -11,12 +11,8 @@ class LossTracker(Tracker):
     def __init__(self,
                  track_batch: bool = True,
                  track_epoch: bool = True,
-                 track_loss: bool = True,
-                 track_penalties: bool = True
                  ) -> None:
         super().__init__(track_batch=track_batch, track_epoch=track_epoch)
-        self.track_loss = track_loss
-        self.track_penalties = track_penalties
 
     def post_batch(self,
                    *args,
@@ -26,11 +22,10 @@ class LossTracker(Tracker):
         
         if not self.track_batch:
             return
-
-        if loss is not None and self.track_loss:
+        
+        if loss is not None:
+            self.epoch_losses_by_batch[f"Total Loss"].append(loss.get_total_loss())
             self.epoch_losses_by_batch[f"Loss {repr(loss)}"].append(loss.value)
-
-        if loss is not None and self.track_penalties:
             for i, penalty in enumerate(loss.penalties):
                 penalty_name = f"Penalty {i+1}_{repr(penalty)}"
                 if penalty_name not in self.epoch_losses_by_batch:
@@ -48,15 +43,13 @@ class LossTracker(Tracker):
         if not self.track_epoch:
             return
 
-        if loss is not None and self.track_loss:
+        if loss is not None:
+            self.epoch_losses[f"Total Loss"] = loss.get_total_loss()
             self.epoch_losses[f"Loss {repr(loss)}"] = loss.value
-
-        if loss is not None and self.track_penalties:
             for i, penalty in enumerate(loss.penalties):
-                penalty_name = f"Penalty {i+1}:{repr(penalty)}"
+                penalty_name = f"Penalty {i}:{repr(penalty)}"
                 self.epoch_losses[penalty_name] = penalty.value
 
-        self.epoch_losses["Total Loss"] = sum(self.epoch_losses.values())
 
     def serialize(self) -> Dict:
         data = {}

@@ -21,7 +21,7 @@ def test_post_optimization_constraint_invalid_framework():
             def apply(self, noise):
                 pass
 
-    with pytest.raises(ValueError, match="framework must be either 'tf' or 'torch'"):
+    with pytest.raises(ValueError, match="framework must be either 'tf', 'torch' or 'numpy'"):
         constraint = DummyConstraint()
         constraint.set_framework("invalid")
 

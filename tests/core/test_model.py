@@ -146,14 +146,14 @@ def test_tf_model_compute_jacobian_flag():
     # With compute_jacobian = True
     al_model = ALModelTF(model)
     al_model.set_compute_jacobian(True)
-    grad_loss, grad_logits = al_model.calculate_gradients(sample, noise_meta, construct_perturbation_fn, target_vector, loss)
+    grad_loss, grad_logits, logits, preds = al_model.calculate_gradients(sample, noise_meta, construct_perturbation_fn, target_vector, loss)
     assert grad_loss is not None
     assert grad_logits is not None
 
     # With compute_jacobian = False
     al_model = ALModelTF(model)
     al_model.set_compute_jacobian(False)
-    grad_loss, grad_logits = al_model.calculate_gradients(sample, noise_meta, construct_perturbation_fn, target_vector, loss)
+    grad_loss, grad_logits, logits, preds = al_model.calculate_gradients(sample, noise_meta, construct_perturbation_fn, target_vector, loss)
     assert grad_loss is not None
     assert grad_logits is None
 

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from typing import Optional, List
 
 class DB(ABC):
     """
@@ -81,5 +82,20 @@ class DB(ABC):
 
         Notes:
             - After calling `close()`, further database operations should not be attempted.
+        """
+        pass
+
+    @abstractmethod
+    def execute_query(self, query: str, params: Optional[List] = None) -> None:
+        """
+        Execute a raw SQL query.
+
+        Parameters:
+            query (str): The SQL query to be executed.
+
+        Notes:
+            - This method should handle the execution of any SQL command, including SELECT, 
+              INSERT, UPDATE, DELETE, etc.
+            - Ensure that the query is safe from SQL injection attacks.
         """
         pass

@@ -16,6 +16,11 @@ class TensorOpsTF:
         return tf.convert_to_tensor(arr, dtype=tf.float32)
     
     @staticmethod
+    def numpy(tensor: TensorType) -> np.ndarray:
+        """Convert a TensorFlow tensor to a numpy array."""
+        return tensor.numpy() if isinstance(tensor, tf.Tensor) else np.array(tensor)
+    
+    @staticmethod
     def constant(value: Union[float, int], dtype: Any) -> TensorType:
         """Create a TensorFlow constant."""
         return tf.constant(value, dtype=dtype)
