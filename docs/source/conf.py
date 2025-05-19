@@ -9,7 +9,7 @@
 project = 'Adversarial Lab'
 copyright = '2025, Pavan Reddy'
 author = 'Pavan Reddy'
-release = '0.0.1rc0'
+release = '0.0.3'
 
 import os
 import sys

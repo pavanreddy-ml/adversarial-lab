@@ -317,7 +317,21 @@ class ALModelTF(ALModelBase):
 
             if self.efficient_mode is not None:
                 indexes = self._get_efficient_mode_indexes(preds, target_vector, num_classes, has_batch_dim)
-                individual_logits = [logits[slice(0, i) if has_batch_dim else slice(i)] if i in indexes else None for i in range(num_classes)]
+                individual_logits = [
+                    (logits[slice(0, 1), slice(i, i + 1)] if has_batch_dim else logits[slice(i, i + 1)])
+                    if i in indexes else None
+                    for i in range(num_classes)
+                ]
+                # individual_logits = []
+                # for i in range(num_classes):
+                #     if i in indexes:
+                #         if has_batch_dim:
+                #             val = logits[0, i]
+                #         else:
+                #             val = logits[i]
+                #         individual_logits.append(val)
+                #     else:
+                #         individual_logits.append(None)
 
         if self._compute_jacobian:
             if self.efficient_mode is not None:
@@ -371,12 +385,14 @@ class ALModelTF(ALModelBase):
                                   noise, 
                                   has_batch_dim
                                   ) -> List[TensorType]:
+        logit_grads = [tape.gradient(logit, noise)[0] if logit is not None else None for logit in individual_logits]
+
         # sample_grad = tape.gradient([i for i in individual_logits if i is not None][0], noise)[0]
         # logit_grads = [tape.gradient(logit, noise)[0] if logit is not None else tf.zeros_like(sample_grad) for logit in individual_logits]
-        logit_grads = [tape.gradient(logit, noise)[0] if logit is not None else None for logit in individual_logits]
-        logit_grads = tf.stack(logit_grads, axis=0)
-        if has_batch_dim:
-            logit_grads = self.tensor_ops.add_batch_dim(logit_grads, axis=0)
+        # logit_grads = tf.stack(logit_grads, axis=0)
+        # if has_batch_dim:
+        #     logit_grads = self.tensor_ops.add_batch_dim(logit_grads, axis=0)
+
         return logit_grads
     
 

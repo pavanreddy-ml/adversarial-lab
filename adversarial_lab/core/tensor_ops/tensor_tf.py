@@ -65,7 +65,7 @@ class TensorOpsTF:
         return tensor
 
     @staticmethod
-    def zeros_like(tensor: TensorType, dtype: Any) -> TensorType:
+    def zeros_like(tensor: TensorType, dtype: Any = "float32") -> TensorType:
         """Create a tensor of ones with the same shape as the input tensor."""
         return tf.zeros_like(tensor, dtype=dtype)
 
@@ -80,7 +80,7 @@ class TensorOpsTF:
         return tf.abs(tensor)
 
     @staticmethod
-    def norm(tensor: TensorType, p: float) -> TensorType:
+    def norm(tensor: TensorType, p: float = 2) -> TensorType:
         """Compute the Lp norm of the tensor."""
         return tf.reduce_sum(tf.abs(tensor) ** p) ** (1.0 / p)
     
@@ -158,6 +158,27 @@ class TensorOpsTF:
     def reshape(tensor: TensorType, shape: List[int]) -> TensorType:
         """Reshape the tensor to the specified shape."""
         return tf.reshape(tensor, shape)
+    
+    @staticmethod
+    def gaussian_blur(tensor: TensorType, sigma: float = 1.0, kernel_size: int = 5) -> TensorType:
+        """Apply a Gaussian blur to a 4D image tensor using depthwise convolution."""
+        if tensor.ndim == 3:
+            tensor = tf.expand_dims(tensor, axis=0)  # Make it 4D
+
+        def get_gaussian_kernel(size: int, sigma: float) -> TensorType:
+            coords = tf.range(size, dtype=tf.float32) - (size - 1.0) / 2.0
+            g = tf.exp(-0.5 * tf.square(coords) / tf.square(sigma))
+            g /= tf.reduce_sum(g)
+            return g
+
+        kernel_1d = get_gaussian_kernel(kernel_size, sigma)
+        kernel_2d = tf.tensordot(kernel_1d, kernel_1d, axes=0)
+        kernel_2d = kernel_2d[:, :, tf.newaxis, tf.newaxis]
+        channels = tf.shape(tensor)[-1]
+        kernel = tf.repeat(kernel_2d, channels, axis=2)
+
+        blurred = tf.nn.depthwise_conv2d(tensor, kernel, strides=[1, 1, 1, 1], padding='SAME')
+        return tf.squeeze(blurred, axis=0) if tensor.shape[0] == 1 else blurred
     
 
 

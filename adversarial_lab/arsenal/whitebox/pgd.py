@@ -19,7 +19,7 @@ class ProjectedGradientDescentAttack(AttacksBase):
                  learning_rate: float = 0.1,
                  epsilon: float = 0.1,
                  binary=False,
-                 verbose: int = 1,
+                 verbose: int = 2,
                  *args,
                  **kwargs):
         self.attacker = WhiteBoxMisclassification(

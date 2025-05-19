@@ -10,13 +10,17 @@ from adversarial_lab.core.types import ModelType, TensorType
 from typing import Callable, Optional, Union, Literal
 
 
-class DeepFoolNoiseGeenerator(AdditiveNoiseGenerator):
+class SmoothFoolNoiseGenerator(AdditiveNoiseGenerator):
     def __init__(self,
                  overshoot: float = 0.1,
+                 sigma: float = 1.0,
+                 kernel_size: int = 3,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
         self.overshoot = overshoot
+        self.sigma = sigma
+        self.kernel_size = kernel_size
 
     def update(self,
                noise_meta,
@@ -32,7 +36,6 @@ class DeepFoolNoiseGeenerator(AdditiveNoiseGenerator):
                ) -> None:
         noise = noise_meta[0]
 
-        # jacobian_tensor = self.tensor_ops.remove_batch_dim(jacobian[0], axis=0)
         jacobian_tensor = jacobian
         logits_vector = self.tensor_ops.remove_batch_dim(logits, axis=0)
         predictions = self.tensor_ops.remove_batch_dim(predictions, axis=0)
@@ -53,20 +56,24 @@ class DeepFoolNoiseGeenerator(AdditiveNoiseGenerator):
             distance = float(distance)
 
             if distance < min_distance:
-              min_distance = distance
-              w = w_k
+                min_distance = distance
+                w = w_k
 
-        r_i = (min_distance + 1e-4) * w / (self.tensor_ops.norm(self.tensor_ops.reshape(w, [-1])) + 1e-8)
+        w_smoothed = self.tensor_ops.gaussian_blur(w, sigma=self.sigma, kernel_size=self.kernel_size)
+
+        r_i = (min_distance + 1e-4) * w_smoothed / (self.tensor_ops.norm(self.tensor_ops.reshape(w_smoothed, [-1])) + 1e-8)
 
         noise.assign(noise + ((1 + self.overshoot) * r_i))
 
 
-class DeepFoolAttack(AttacksBase):
+class SmoothFoolAttack(AttacksBase):
     def __init__(self,
                  model,
                  preprocessing_fn,
                  epsilon=0.1,
                  overshoot=0.1,
+                 sigma=1.0,
+                 kernel_size=3,
                  binary=False,
                  verbose=2,
                  *args,
@@ -75,7 +82,7 @@ class DeepFoolAttack(AttacksBase):
             model=model,
             loss=CategoricalCrossEntropy() if not binary else BinaryCrossEntropy(),
             optimizer=PGD(learning_rate=0.1),
-            noise_generator=DeepFoolNoiseGeenerator(requires_jacobian=True, overshoot=overshoot),
+            noise_generator=SmoothFoolNoiseGenerator(requires_jacobian=True, overshoot=overshoot, sigma=sigma, kernel_size=kernel_size),
             preprocessing=preprocessing_fn,
             constraints=[POClip(min=-epsilon, max=epsilon)],
             verbose=verbose,

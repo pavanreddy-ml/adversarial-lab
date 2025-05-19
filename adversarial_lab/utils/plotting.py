@@ -20,7 +20,9 @@ class Plotting:
                               noise: np.ndarray,
                               include: Optional[List[Literal[
                                   "image", "noise", "normalized_noise", "noised_image"
-                              ]]] = None):
+                              ]]] = None,
+                              config: Optional[dict] = None) -> None:
+        config = config or {}
         include = include or ["image", "noise", "normalized_noise", "noised_image"]
 
         if image.shape[0] == 1:
@@ -67,8 +69,12 @@ class Plotting:
 
         for ax, img, title in zip(axes, plots, titles):
             ax.imshow(img, cmap='gray' if img.ndim == 2 else None)
-            ax.set_title(title)
+            if config.get("show_subtitle", True):
+                ax.set_title(title)
             ax.axis('off')
+
+        if config.get("title") is not None:
+            fig.suptitle(config["title"])
 
         plt.tight_layout()
         plt.show()

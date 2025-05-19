@@ -52,6 +52,7 @@ class CarliniWagnerAttack(AttacksBase):
                  C=0.0,
                  kappa=0.0,
                  learning_rate=0.01,
+                 verbose=2,
                  *args,
                  **kwargs):
         self.attacker = WhiteBoxMisclassification(
@@ -60,6 +61,7 @@ class CarliniWagnerAttack(AttacksBase):
             optimizer=Adam(learning_rate=learning_rate),
             noise_generator=AdditiveNoiseGenerator(),
             preprocessing=preprocessing_fn,
+            verbose=verbose,
             *args,
             **kwargs
         )

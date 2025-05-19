@@ -157,6 +157,31 @@ class TensorOpsTorch:
     def reshape(tensor: TensorType, shape: List[int]) -> TensorType:
         """Reshape the tensor to the specified shape."""
         return tensor.view(*shape)
+    
+    @staticmethod
+    def gaussian_blur(tensor: torch.Tensor, sigma: float = 1.0, kernel_size: int = 5) -> torch.Tensor:
+        """Apply a Gaussian blur to a 4D or 3D tensor using depthwise convolution."""
+
+        if tensor.dim() == 3:
+            tensor = tensor.unsqueeze(0)  # Add batch dimension
+
+        channels = tensor.size(1) if tensor.dim() == 4 else tensor.size(0)
+        
+        def get_gaussian_kernel(size, sigma):
+            coords = torch.arange(size, dtype=torch.float32) - (size - 1) / 2.0
+            kernel = torch.exp(-coords ** 2 / (2 * sigma ** 2))
+            kernel = kernel / kernel.sum()
+            return kernel
+
+        kernel_1d = get_gaussian_kernel(kernel_size, sigma)
+        kernel_2d = torch.outer(kernel_1d, kernel_1d)
+        kernel_2d = kernel_2d.expand(channels, 1, kernel_size, kernel_size).to(tensor.device)
+
+        # Apply depthwise convolution
+        padding = kernel_size // 2
+        blurred = F.conv2d(tensor, kernel_2d, groups=channels, padding=padding)
+
+        return blurred.squeeze(0) if blurred.size(0) == 1 else blurred
 
 
 class TorchLosses:

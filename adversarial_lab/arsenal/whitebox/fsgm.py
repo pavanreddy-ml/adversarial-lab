@@ -16,6 +16,7 @@ class FastSignGradientMethodAttack(AttacksBase):
                  preprocessing_fn: Callable,
                  epsilon: float = 0.1,
                  binary=False,
+                 verbose: int = 2,
                  *args,
                  **kwargs
                  ):
@@ -25,6 +26,7 @@ class FastSignGradientMethodAttack(AttacksBase):
             optimizer=PGD(learning_rate=epsilon),
             noise_generator=AdditiveNoiseGenerator(),
             preprocessing=preprocessing_fn,
+            verbose=verbose,
             *args,
             **kwargs
         )

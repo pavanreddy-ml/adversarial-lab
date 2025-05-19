@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
+from scipy.ndimage import gaussian_filter
+
 from typing import Union, List, Any
 
 class TensorOpsNumpy:
@@ -128,6 +130,27 @@ class TensorOpsNumpy:
     @staticmethod
     def reshape(array: np.ndarray, shape: List[int]) -> np.ndarray:
         return np.reshape(array, shape)
+    
+    @staticmethod
+    def gaussian_blur(array: np.ndarray, sigma: float = 1.0, kernel_size: int = 5) -> np.ndarray:
+        """Apply a Gaussian blur to a 2D or 3D NumPy array."""
+        from scipy.ndimage import gaussian_filter
+
+        if array.ndim == 2:
+            return gaussian_filter(array, sigma=sigma)
+
+        if array.ndim == 3:
+            # Apply per-channel
+            return np.stack([gaussian_filter(array[..., c], sigma=sigma) for c in range(array.shape[-1])], axis=-1)
+
+        if array.ndim == 4:
+            # Batch processing: [B, H, W, C]
+            return np.stack([
+                np.stack([gaussian_filter(image[..., c], sigma=sigma) for c in range(image.shape[-1])], axis=-1)
+                for image in array
+            ], axis=0)
+
+        raise ValueError(f"Unsupported array shape for gaussian_blur: {array.shape}")
 
 
 class NumpyLosses:
